@@ -147,7 +147,14 @@ app.put('/api/state', auth, async (req, res) => {
 });
 
 /* ── Static app ── */
-app.use(express.static(__dirname, { index: 'index.html' }));
+app.use(express.static(__dirname, {
+  index: 'index.html',
+  setHeaders: (res, filePath) => {
+    // Always revalidate the page itself so redeploys reach phones immediately
+    // (304 responses keep it fast when nothing changed).
+    if (filePath.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache');
+  },
+}));
 
 initStorage()
   .then(() => app.listen(PORT, () => console.log('TalentScope running on port ' + PORT)))
