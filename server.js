@@ -75,8 +75,61 @@ function auth(req, res, next) {
   res.status(401).json({ error: 'Team code required' });
 }
 
+/* ── AI proxy — keys live ONLY in Railway environment variables, never in the client ── */
+const AI_KEYS = {
+  anthropic: process.env.ANTHROPIC_API_KEY || '',
+  openai: process.env.OPENAI_API_KEY || '',
+  google: process.env.GOOGLE_API_KEY || '',
+};
+
+app.post('/api/ai/claude', auth, async (req, res) => {
+  if (!AI_KEYS.anthropic) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured on server' });
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': AI_KEYS.anthropic,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(req.body),
+    });
+    res.status(r.status).json(await r.json());
+  } catch (e) { res.status(502).json({ error: 'Upstream Anthropic error: ' + e.message }); }
+});
+
+app.post('/api/ai/openai', auth, async (req, res) => {
+  if (!AI_KEYS.openai) return res.status(503).json({ error: 'OPENAI_API_KEY not configured on server' });
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AI_KEYS.openai },
+      body: JSON.stringify(req.body),
+    });
+    res.status(r.status).json(await r.json());
+  } catch (e) { res.status(502).json({ error: 'Upstream OpenAI error: ' + e.message }); }
+});
+
+app.post('/api/ai/gemini', auth, async (req, res) => {
+  if (!AI_KEYS.google) return res.status(503).json({ error: 'GOOGLE_API_KEY not configured on server' });
+  try {
+    const model = req.query.model || 'gemini-3.1-pro-preview';
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${AI_KEYS.google}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+    });
+    res.status(r.status).json(await r.json());
+  } catch (e) { res.status(502).json({ error: 'Upstream Gemini error: ' + e.message }); }
+});
+
 /* ── API ── */
-app.get('/api/health', (req, res) => res.json({ ok: true, storage: usePg ? 'postgres' : 'file', protected: !!TEAM_CODE }));
+app.get('/api/health', (req, res) => res.json({
+  ok: true,
+  storage: usePg ? 'postgres' : 'file',
+  protected: !!TEAM_CODE,
+  serverKeys: { anthropic: !!AI_KEYS.anthropic, openai: !!AI_KEYS.openai, google: !!AI_KEYS.google },
+}));
 
 app.get('/api/state', auth, async (req, res) => {
   try {

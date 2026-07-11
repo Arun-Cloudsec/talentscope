@@ -4273,12 +4273,12 @@ function updateRunButton() {
 document.getElementById('runBtn').addEventListener('click', runScreening);
 
 async function runScreening() {
-  if (!state.anthKey) {
+  if (!hasKey('anthropic')) {
     notify('Anthropic API key is required to run screening.', true);
     return;
   }
-  const needs = { openai: 'oaiKey', gemini: 'googKey', haiku: 'anthKey' };
-  if (!state[needs[state.secondaryModel]]) {
+  const needs = { openai: 'openai', gemini: 'google', haiku: 'anthropic' };
+  if (!hasKey(needs[state.secondaryModel])) {
     const names = { openai: 'OpenAI', gemini: 'Google', haiku: 'Anthropic' };
     notify(`${names[state.secondaryModel]} API key is required for the selected secondary.`, true);
     return;
@@ -4499,10 +4499,24 @@ RULES:
 - Output JSON only.`;
 }
 
-async function callClaude(candidate) {
-  const prompt = buildPrompt(candidate);
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+/* ── AI request router: use the server proxy (keys held in Railway env vars)
+   when available; fall back to direct calls with per-browser keys otherwise. ── */
+let SERVER_KEYS = { anthropic: false, openai: false, google: false };
+
+function aiFetch(provider, { body, geminiModel } = {}) {
+  const proxyMap = {
+    claude: ['/api/ai/claude', 'anthropic'],
+    haiku: ['/api/ai/claude', 'anthropic'],
+    openai: ['/api/ai/openai', 'openai'],
+    gemini: ['/api/ai/gemini' + (geminiModel ? `?model=${encodeURIComponent(geminiModel)}` : ''), 'google'],
+  };
+  const [proxyPath, keyName] = proxyMap[provider];
+  if (SYNC.serverAvailable && SERVER_KEYS[keyName]) {
+    return fetch(proxyPath, { method: 'POST', headers: syncHeaders(), body });
+  }
+  // Direct-from-browser fallback (local keys)
+  if (provider === 'claude' || provider === 'haiku') {
+    return fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -4510,6 +4524,29 @@ async function callClaude(candidate) {
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
+      body,
+    });
+  }
+  if (provider === 'openai') {
+    return fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.oaiKey },
+      body,
+    });
+  }
+  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel || 'gemini-3.1-pro-preview'}:generateContent?key=${state.googKey}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+  });
+}
+function hasKey(which) { // 'anthropic' | 'openai' | 'google'
+  const local = { anthropic: state.anthKey, openai: state.oaiKey, google: state.googKey };
+  return !!local[which] || (SYNC.serverAvailable && SERVER_KEYS[which]);
+}
+
+async function callClaude(candidate) {
+  const prompt = buildPrompt(candidate);
+  try {
+    const response = await aiFetch('claude', {
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         // Sonnet 5 has adaptive thinking ON by default and thinking tokens count
@@ -4555,9 +4592,7 @@ async function callSecondary(candidate) {
 
 async function callOpenAI(prompt) {
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.oaiKey },
+    const response = await aiFetch('openai', {
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
@@ -4573,10 +4608,9 @@ async function callOpenAI(prompt) {
 
 async function callGemini(prompt) {
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${state.googKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    const response = await aiFetch('gemini', {
+      geminiModel: 'gemini-3.1-pro-preview',
+      body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
         }) });
@@ -4588,14 +4622,7 @@ async function callGemini(prompt) {
 
 async function callHaiku(prompt) {
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': state.anthKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+    const response = await aiFetch('haiku', {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 1500,
@@ -5394,7 +5421,7 @@ async function sendAIMessage() {
 }
 
 async function askAI(question) {
-  if (!state.anthKey) throw new Error('Anthropic API key required. Add it in Settings.');
+  if (!hasKey('anthropic')) throw new Error('Anthropic API key required. Add it in Settings.');
 
   // Build context from results
   const context = buildAIContext();
@@ -5410,14 +5437,7 @@ ${context}`;
   // Build message history for multi-turn
   const messages = aiConversation.slice(-8).map(m => ({ role: m.role, content: m.content }));
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': state.anthKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
+  const response = await aiFetch('claude', {
     body: JSON.stringify({
       model: 'claude-sonnet-5',
       max_tokens: 3000,
@@ -5541,7 +5561,8 @@ function clearKeys() {
 function updateKeyIndicator() {
   const dot = document.getElementById('keyDot');
   const label = document.getElementById('keyLabel');
-  if (state.anthKey) { dot.classList.add('set'); label.textContent = 'Keys · Set'; }
+  if (SYNC.serverAvailable && SERVER_KEYS.anthropic && !state.anthKey) { dot.classList.add('set'); label.textContent = 'Keys · Managed'; }
+  else if (state.anthKey) { dot.classList.add('set'); label.textContent = 'Keys · Set'; }
   else { dot.classList.remove('set'); label.textContent = 'API Keys'; }
 }
 updateKeyIndicator();
@@ -6234,6 +6255,7 @@ function restoreSession() {
       const h = await fetch('/api/health');
       if (h.ok) {
         SYNC.serverAvailable = true;
+        try { const info = await h.json(); if (info.serverKeys) { SERVER_KEYS = info.serverKeys; updateKeyIndicator(); if (typeof updateRunReady === 'function') updateRunReady(); } } catch (e) {}
         await syncPull({ silentIfUnchanged: false });
         setInterval(() => syncPull(), SYNC.pollMs);
       }
