@@ -3010,7 +3010,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
       <nav class="main-nav">
         <a class="active" data-view="screening">Screening</a>
         <a data-scroll="panelJD">Roles</a>
-        <a data-scroll="panelCandidates">Candidates</a>
+        <a data-view="dashboard">Candidates</a>
         <a data-scroll="results">Reports</a>
         <a data-view="guide">Guide</a>
       </nav>
@@ -3294,6 +3294,63 @@ tbody td { padding: 14px 16px; vertical-align: top; }
       <p class="modal__hint" style="margin-top:10px;">
         ✉ <b>Email</b> opens a fully pre-written invitation in your mail client — review &amp; hit send. When the candidate replies, record their chosen slot under <b>Response</b>; the other two slots are released back to the pool automatically. 📆 <b>Invite (.ics)</b> creates a calendar meeting addressed to both candidate and interviewer — open it and press Send.
       </p>
+    </section>
+
+  </div>
+
+  <!-- ═══════════════════════════ TALENT DASHBOARD VIEW ═══════════════════════════ -->
+  <div class="page" id="viewDashboard" style="display:none;">
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ ∑</span>
+          <span class="panel__name">Talent <em>Dashboard</em></span>
+        </div>
+        <span class="panel__count" id="dashSince">All CVs since day 1</span>
+      </div>
+      <p class="panel__desc">Every CV ever screened, across all roles and all screening runs — shared by the whole team.</p>
+      <div class="summary-grid" id="dashSummary"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ R</span>
+          <span class="panel__name">By <em>Role</em></span>
+        </div>
+      </div>
+      <div class="results-table">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th>Role</th><th>CVs Uploaded</th><th>Approved</th><th>Rejected</th><th>Borderline</th><th>Approval Rate</th><th>Last Screening</th></tr>
+            </thead>
+            <tbody id="dashRoleBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ ?</span>
+          <span class="panel__name">Candidate <em>Lookup</em></span>
+        </div>
+      </div>
+      <p class="panel__desc">Pick a role to narrow the list, or search straight by candidate name — either way you get their full status.</p>
+      <div class="sched-config">
+        <div class="sched-field">
+          <label>Filter by role</label>
+          <select id="dashRoleSelect"><option value="">All roles</option></select>
+        </div>
+        <div class="sched-field">
+          <label>Candidate name</label>
+          <select id="dashCandSelect"><option value="">— select candidate —</option></select>
+        </div>
+      </div>
+      <div id="dashCandStatus" style="margin-top:6px;"></div>
     </section>
 
   </div>
@@ -3775,6 +3832,11 @@ document.getElementById('signOutBtn').addEventListener('click', signOut);
 function showView(viewName) {
   document.getElementById('viewScreening').style.display = viewName === 'screening' ? '' : 'none';
   document.getElementById('viewGuide').style.display = viewName === 'guide' ? '' : 'none';
+  const dash = document.getElementById('viewDashboard');
+  if (dash) {
+    dash.style.display = viewName === 'dashboard' ? '' : 'none';
+    if (viewName === 'dashboard' && typeof renderDashboard === 'function') renderDashboard();
+  }
   document.querySelectorAll('.main-nav a[data-view]').forEach(a => {
     a.classList.toggle('active', a.dataset.view === viewName);
   });
@@ -4285,6 +4347,7 @@ async function runScreening() {
 
   setTimeout(() => {
     document.getElementById('progressSection').classList.remove('visible');
+    if (typeof recordHistory === 'function') recordHistory();
     renderResults();
     // Auto-download the Excel report (Summary + Candidate detail tabs) as soon as screening finishes.
     if (state.results.length > 0) {
@@ -5943,6 +6006,124 @@ function showSchedulingIfReady() {
   if (shortlistedCandidates().length > 0) { panel.style.display = ''; updateSchedCounts(); }
 }
 
+/* ═══════════════════════════ TALENT DASHBOARD (all-time history) ═══════════════════════════ */
+state.history = state.history || [];
+
+function recordHistory() {
+  const runTs = new Date().toISOString();
+  const role = state.jdName || 'Unspecified role';
+  state.results.forEach(r => {
+    state.history.push({
+      ts: runTs,
+      role,
+      name: r.name || r.filename,
+      email: r.email && r.email !== '—' ? r.email : '',
+      score: r.score,
+      final: r.final,
+      reason: r.reason || '',
+    });
+  });
+}
+
+const VERDICT_LABEL = { approved: 'Approved ✓', rejected: 'Rejected ✕', borderline: 'Borderline ⚠', error: 'Error' };
+const VERDICT_COLOR = { approved: 'var(--approved)', rejected: 'var(--rejected)', borderline: 'var(--borderline)', error: 'var(--ink-3, #888)' };
+function verdictPill(final) {
+  return `<span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; color:#fff; background:${VERDICT_COLOR[final] || '#888'};">${VERDICT_LABEL[final] || final}</span>`;
+}
+
+function dashHistory() {
+  // Backfill: if the team screened CVs before history existed, seed from current results
+  if (state.history.length === 0 && state.results.length > 0) { recordHistory(); persistSession(); }
+  return state.history;
+}
+
+function renderDashboard() {
+  const hist = dashHistory();
+  const total = hist.length;
+  const count = f => hist.filter(h => h.final === f).length;
+  const approved = count('approved'), rejected = count('rejected'), borderline = count('borderline');
+
+  document.getElementById('dashSince').textContent = total > 0
+    ? `${total} CVs since ${new Date(Math.min(...hist.map(h => +new Date(h.ts)))).toLocaleDateString()}`
+    : 'No CVs screened yet';
+
+  document.getElementById('dashSummary').innerHTML = `
+    <div class="summary-card"><div class="summary-card__label">Total CVs Uploaded</div><div class="summary-card__num">${total}</div><div class="summary-card__sub">All roles · all time</div></div>
+    <div class="summary-card approved"><div class="summary-card__label">Approved</div><div class="summary-card__num">${approved}</div><div class="summary-card__sub">${total ? Math.round(approved / total * 100) : 0}% of all CVs</div></div>
+    <div class="summary-card rejected"><div class="summary-card__label">Rejected</div><div class="summary-card__num">${rejected}</div><div class="summary-card__sub">${total ? Math.round(rejected / total * 100) : 0}% of all CVs</div></div>
+    <div class="summary-card borderline"><div class="summary-card__label">Borderline</div><div class="summary-card__num">${borderline}</div><div class="summary-card__sub">Needs human review</div></div>`;
+
+  const roles = {};
+  hist.forEach(h => {
+    if (!roles[h.role]) roles[h.role] = { total: 0, approved: 0, rejected: 0, borderline: 0, last: h.ts };
+    const R = roles[h.role];
+    R.total++;
+    if (R[h.final] !== undefined) R[h.final]++;
+    if (h.ts > R.last) R.last = h.ts;
+  });
+  const roleBody = document.getElementById('dashRoleBody');
+  roleBody.innerHTML = Object.entries(roles)
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([role, R]) => `<tr>
+      <td><b>${role}</b></td>
+      <td>${R.total}</td>
+      <td style="color:var(--approved); font-weight:700;">${R.approved}</td>
+      <td style="color:var(--rejected); font-weight:700;">${R.rejected}</td>
+      <td style="color:var(--borderline); font-weight:700;">${R.borderline}</td>
+      <td>${R.total ? Math.round(R.approved / R.total * 100) : 0}%</td>
+      <td style="font-size:12px;">${new Date(R.last).toLocaleDateString()}</td>
+    </tr>`).join('') || '<tr><td colspan="7" style="opacity:0.6;">Run a screening and every CV will be tracked here.</td></tr>';
+
+  const roleSel = document.getElementById('dashRoleSelect');
+  const prevRole = roleSel.value;
+  roleSel.innerHTML = '<option value="">All roles</option>' +
+    Object.keys(roles).sort().map(r => `<option value="${r.replace(/"/g, '&quot;')}">${r}</option>`).join('');
+  if ([...roleSel.options].some(o => o.value === prevRole)) roleSel.value = prevRole;
+  populateCandDropdown();
+}
+
+function populateCandDropdown() {
+  const role = document.getElementById('dashRoleSelect').value;
+  const candSel = document.getElementById('dashCandSelect');
+  const prev = candSel.value;
+  const names = [...new Set(dashHistory()
+    .filter(h => !role || h.role === role)
+    .map(h => h.name))].sort();
+  candSel.innerHTML = '<option value="">— select candidate —</option>' +
+    names.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+  if ([...candSel.options].some(o => o.value === prev)) candSel.value = prev;
+  renderCandStatus();
+}
+
+function renderCandStatus() {
+  const role = document.getElementById('dashRoleSelect').value;
+  const name = document.getElementById('dashCandSelect').value;
+  const box = document.getElementById('dashCandStatus');
+  if (!name) { box.innerHTML = ''; return; }
+  const records = dashHistory()
+    .filter(h => h.name === name && (!role || h.role === role))
+    .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  const inv = state.sched.invites.find(i => i.candidateName === name);
+  const schedLine = inv ? `<div style="margin-top:8px; font-size:12.5px;">📅 Interview: <b>${{
+    pending: 'slots assigned, invitation not sent yet', invited: 'invited — awaiting reply',
+    confirmed: 'slot confirmed', declined: 'candidate declined', noresponse: 'no response',
+  }[inv.status] || inv.status}</b></div>` : '';
+  box.innerHTML = `
+    <div class="results-table"><div class="table-scroll"><table>
+      <thead><tr><th>Role</th><th>Screened On</th><th>Score</th><th>Status</th><th>Assessment</th></tr></thead>
+      <tbody>${records.map(h => `<tr>
+        <td>${h.role}</td>
+        <td style="font-size:12px;">${new Date(h.ts).toLocaleString()}</td>
+        <td><b>${h.score ?? '—'}</b></td>
+        <td>${verdictPill(h.final)}</td>
+        <td style="font-size:12px; max-width:320px;">${h.reason}</td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>${schedLine}`;
+}
+
+document.getElementById('dashRoleSelect').addEventListener('change', populateCandDropdown);
+document.getElementById('dashCandSelect').addEventListener('change', renderCandStatus);
+
 /* ═══ CENTRAL STATE SYNC — shared team workspace on the server ═══
    When served from the Railway app, all screening results and scheduling data
    are stored centrally (Postgres) so every HR user sees the same live data.
@@ -5977,15 +6158,17 @@ function snapshotState() {
     jdName: state.jdName || '',
     results: state.results,
     sched: state.sched,
+    history: state.history || [],
   };
 }
 
 function applySnapshot(s) {
-  if (!s || !Array.isArray(s.results)) return false;
+  if (!s || (!Array.isArray(s.results) && !Array.isArray(s.history))) return false;
   SYNC.applyingRemote = true;
   try {
-    state.results = s.results;
+    state.results = Array.isArray(s.results) ? s.results : [];
     state.jdName = s.jdName || state.jdName;
+    state.history = Array.isArray(s.history) ? s.history : (state.history || []);
     if (s.sched) state.sched = Object.assign({ slots: [], invites: [], availFileName: '' }, s.sched);
     if (state.results.length > 0) renderResults();
     if (state.sched.availFileName) {
@@ -5996,6 +6179,8 @@ function applySnapshot(s) {
     }
     renderSchedTable();
     showSchedulingIfReady();
+    const dash = document.getElementById('viewDashboard');
+    if (dash && dash.style.display !== 'none') renderDashboard();
     return true;
   } finally { SYNC.applyingRemote = false; }
 }
