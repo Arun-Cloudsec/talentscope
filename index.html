@@ -4503,6 +4503,17 @@ RULES:
    when available; fall back to direct calls with per-browser keys otherwise. ── */
 let SERVER_KEYS = { anthropic: false, openai: false, google: false };
 
+/* Central-sync state — declared here (early) because updateKeyIndicator()
+   reads SYNC.serverAvailable during initial page load. */
+const SYNC = {
+  serverAvailable: false,
+  lastSeenUpdatedAt: null,
+  teamCode: localStorage.getItem('ts_team_code') || '',
+  saveTimer: null,
+  applyingRemote: false,
+  pollMs: 20000,
+};
+
 function aiFetch(provider, { body, geminiModel } = {}) {
   const proxyMap = {
     claude: ['/api/ai/claude', 'anthropic'],
@@ -6148,15 +6159,9 @@ document.getElementById('dashCandSelect').addEventListener('change', renderCandS
 /* ═══ CENTRAL STATE SYNC — shared team workspace on the server ═══
    When served from the Railway app, all screening results and scheduling data
    are stored centrally (Postgres) so every HR user sees the same live data.
-   Falls back to browser localStorage when opened as a local file. */
-const SYNC = {
-  serverAvailable: false,
-  lastSeenUpdatedAt: null,
-  teamCode: localStorage.getItem('ts_team_code') || '',
-  saveTimer: null,
-  applyingRemote: false,
-  pollMs: 20000,
-};
+   Falls back to browser localStorage when opened as a local file.
+   (The SYNC state object is declared earlier, alongside SERVER_KEYS, because
+   updateKeyIndicator reads it during initial page load.) */
 
 function syncHeaders() {
   const h = { 'Content-Type': 'application/json' };
