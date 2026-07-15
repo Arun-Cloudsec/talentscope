@@ -14,7 +14,7 @@
 <script>
 /* Build stamp + fatal-error banner. This runs before the app script, so even a
    crash during page load produces a visible red banner instead of silence. */
-window.__TS_BUILD = '2026-07-13.3';
+window.__TS_BUILD = '2026-07-13.4';
 window.addEventListener('error', function (e) {
   try {
     if (document.getElementById('tsFatalBanner')) return;
@@ -5977,20 +5977,39 @@ function sendInviteEmail(idx) {
   const { subject, body } = buildInviteEmail(inv);
   const organizer = document.getElementById('schedOrganizer').value.trim();
   const pref = document.getElementById('schedMailClient').value;
+
+  const webComposeUrl = 'https://outlook.office.com/mail/deeplink/compose'
+    + '?to=' + encodeURIComponent(inv.candidateEmail)
+    + (organizer ? '&cc=' + encodeURIComponent(organizer) : '')
+    + '&subject=' + encodeURIComponent(subject)
+    + '&body=' + encodeURIComponent(body);
+
   if (pref === 'web') {
-    // Outlook on the web compose (independent of OS default mail app)
-    const outlookUrl = 'https://outlook.office.com/mail/deeplink/compose'
-      + '?to=' + encodeURIComponent(inv.candidateEmail)
-      + (organizer ? '&cc=' + encodeURIComponent(organizer) : '')
-      + '&subject=' + encodeURIComponent(subject)
-      + '&body=' + encodeURIComponent(body);
-    const win = window.open(outlookUrl, '_blank');
+    const win = window.open(webComposeUrl, '_blank');
     if (!win) notify('Popup blocked — allow popups for this site, or switch "Email opens in" to Desktop mail app.', false);
   } else {
-    // Desktop mail app: mailto opens the OS default client. Set Outlook as the
-    // default mail app on the laptop for this to open desktop Outlook.
-    const cc = organizer ? `&cc=${encodeURIComponent(organizer)}` : '';
-    window.location.href = `mailto:${encodeURIComponent(inv.candidateEmail)}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
+    const isMac = /Mac/i.test(navigator.platform || navigator.userAgent);
+    if (isMac) {
+      // On macOS, mailto: opens the system default (usually Apple Mail).
+      // Target the Outlook app directly via its URL scheme; if Outlook isn't
+      // installed the scheme is ignored, so fall back to Outlook Web after a
+      // short delay (page stays visible = the app didn't open).
+      const appUrl = 'ms-outlook://compose'
+        + '?to=' + encodeURIComponent(inv.candidateEmail)
+        + '&subject=' + encodeURIComponent(subject)
+        + '&body=' + encodeURIComponent(body);
+      const fallback = setTimeout(() => {
+        if (!document.hidden) window.open(webComposeUrl, '_blank');
+      }, 1600);
+      window.addEventListener('visibilitychange', function onVis() {
+        if (document.hidden) { clearTimeout(fallback); window.removeEventListener('visibilitychange', onVis); }
+      });
+      window.location.href = appUrl;
+    } else {
+      // Windows: mailto opens the default mail app (Outlook when set as default)
+      const cc = organizer ? `&cc=${encodeURIComponent(organizer)}` : '';
+      window.location.href = `mailto:${encodeURIComponent(inv.candidateEmail)}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
+    }
   }
   inv.status = inv.status === 'pending' ? 'invited' : inv.status;
   inv.invitedAt = new Date().toISOString();
