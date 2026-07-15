@@ -10,6 +10,24 @@
 
 <!-- File parsing & export libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* Build stamp + fatal-error banner. This runs before the app script, so even a
+   crash during page load produces a visible red banner instead of silence. */
+window.__TS_BUILD = '2026-07-13.3';
+window.addEventListener('error', function (e) {
+  try {
+    if (document.getElementById('tsFatalBanner')) return;
+    var d = document.createElement('div');
+    d.id = 'tsFatalBanner';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#B23A48;color:#fff;font:13px/1.5 system-ui;padding:10px 16px;text-align:center;';
+    d.textContent = '⚠ TalentScope failed to load (' + (e.message || 'script error') +
+      '). Try a hard refresh or empty the browser cache — Safari: Develop → Empty Caches. Build ' + window.__TS_BUILD;
+    (document.body || document.documentElement).appendChild(d);
+  } catch (_) {}
+});
+console.info('TalentScope build', window.__TS_BUILD);
+</script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -3098,10 +3116,10 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         </p>
 
         <label class="drop-zone" id="candDropZone">
-          <input type="file" id="candFiles" accept=".pdf,.docx,.doc,.txt,.rtf,.md" multiple>
+          <input type="file" id="candFiles" accept=".pdf,.docx,.doc,.txt,.rtf,.md,.zip" multiple>
           <div class="drop-zone__icon">👥</div>
           <div class="drop-zone__text">Drop multiple resumes here</div>
-          <div class="drop-zone__sub">or click to browse · select many files at once</div>
+          <div class="drop-zone__sub">or click to browse · select many files or a .zip of CVs</div>
         </label>
 
         <div class="candidate-list" id="candidateList"></div>
@@ -3246,6 +3264,13 @@ tbody td { padding: 14px 16px; vertical-align: top; }
             <option value="60">60 minutes</option>
           </select>
         </div>
+        <div class="sched-field">
+          <label>Email opens in</label>
+          <select id="schedMailClient">
+            <option value="desktop" selected>Desktop mail app (Outlook)</option>
+            <option value="web">Outlook Web</option>
+          </select>
+        </div>
         <div class="sched-field" style="flex:2;">
           <label>Location / meeting link</label>
           <input type="text" id="schedLocation" placeholder="Microsoft Teams (link will follow) or Office address">
@@ -3269,6 +3294,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
           <span>Confirmed: <b id="schedConfirmed">0</b></span>
         </div>
         <div style="display:flex; gap:8px;">
+          <button class="btn-export" id="schedMergeBtn" disabled>📧 Mail-Merge Export</button>
           <button class="btn-export" id="schedExportBtn" disabled>📗 Scheduling Report</button>
           <button class="btn-primary" id="schedAssignBtn" disabled><span class="icon">📅</span> Assign Slots to Shortlisted</button>
         </div>
@@ -3310,6 +3336,9 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <span class="panel__count" id="dashSince">All CVs since day 1</span>
       </div>
       <p class="panel__desc">Every CV ever screened, across all roles and all screening runs — shared by the whole team.</p>
+      <div style="text-align:right; margin-bottom:8px;">
+        <button class="btn-clear" id="dashClearAll">🗑 Clear all history</button>
+      </div>
       <div class="summary-grid" id="dashSummary"></div>
     </section>
 
@@ -4119,7 +4148,35 @@ const candFile = document.getElementById('candFiles');
 const candDropZone = document.getElementById('candDropZone');
 const candidateList = document.getElementById('candidateList');
 
-setupDropZone(candDropZone, candFile, async (files) => {
+setupDropZone(candDropZone, candFile, async (rawFiles) => {
+  // Expand any .zip archives into their contained CV files first
+  const files = [];
+  for (const f of rawFiles) {
+    if (f.name.toLowerCase().endsWith('.zip')) {
+      if (typeof JSZip === 'undefined') { notify('Zip support library failed to load — check your connection and refresh.', false); continue; }
+      try {
+        const zip = await JSZip.loadAsync(await f.arrayBuffer());
+        const supported = ['.pdf', '.docx', '.doc', '.txt', '.rtf', '.md'];
+        let extracted = 0;
+        for (const [path, entry] of Object.entries(zip.files)) {
+          if (entry.dir) continue;
+          const base = path.split('/').pop();
+          // Skip macOS metadata and hidden files
+          if (path.startsWith('__MACOSX') || base.startsWith('.') || base.startsWith('~$')) continue;
+          if (!supported.some(ext => base.toLowerCase().endsWith(ext))) continue;
+          const blob = await entry.async('blob');
+          files.push(new File([blob], base, { type: blob.type }));
+          extracted++;
+        }
+        if (extracted === 0) notify(`${f.name}: no supported CV files found inside (looking for PDF, Word, TXT, RTF, MD).`, false);
+      } catch (e) {
+        notify(`Could not read ${f.name}: ${e.message}`, false);
+      }
+    } else {
+      files.push(f);
+    }
+  }
+
   let loaded = 0, failed = 0, dup = 0;
   const errors = [];
   for (const f of files) {
@@ -5382,7 +5439,10 @@ function formatAIText(text) {
   // Simple markdown → HTML: **bold**, *italic*, `code`, bullet lists
   let html = escHtml(text);
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/(?<!\*)\*(?!\*)([^*\n]+?)\*(?!\*)/g, '<em>$1</em>');
+  // Italic without regex lookbehind — lookbehind is a parse-time SyntaxError on
+  // Safari < 16.4 and would kill the entire script. Match the preceding
+  // non-asterisk char (or line start) explicitly and re-insert it.
+  html = html.replace(/(^|[^*])\*(?!\*)([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
   html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
   // Convert numbered/bullet lists
@@ -5815,9 +5875,11 @@ function renderSchedTable() {
     // Slot chips — clickable to record the candidate's confirmed choice
     const chips = slots.map((s, i) => {
       let cls = 'slot-chip';
+      let tip = 'Click when the candidate confirms this slot';
       if (inv.confirmedSlotId === s.id) cls += ' confirmed';
       else if (inv.confirmedSlotId) cls += ' released';
-      return `<span class="${cls}" data-idx="${idx}" data-slot="${s.id}" title="Click when the candidate confirms this slot">${i + 1}. ${s.date} ${s.start}${s.end ? '–' + s.end : ''}</span>`;
+      else if (s.takenBy && s.takenBy !== inv.candidateName) { cls += ' released'; tip = 'Already confirmed by ' + s.takenBy + ' — use 🔄 Re-offer'; }
+      return `<span class="${cls}" data-idx="${idx}" data-slot="${s.id}" title="${tip}">${i + 1}. ${s.date} ${s.start}${s.end ? '–' + s.end : ''}</span>`;
     }).join('');
 
     const pill = {
@@ -5847,6 +5909,7 @@ function renderSchedTable() {
       <td>
         <button class="sched-mini-btn" data-mail="${idx}">✉ Email</button>
         <button class="sched-mini-btn" data-copy="${idx}">📋 Copy</button>
+        <button class="sched-mini-btn" data-reoffer="${idx}" title="Release these slots and offer 3 fresh ones">🔄 Re-offer</button>
         <button class="sched-mini-btn" data-ics="${idx}" ${canIcs ? '' : 'disabled'}>📆 Invite (.ics)</button>
       </td>`;
     tbody.appendChild(tr);
@@ -5864,6 +5927,7 @@ function renderSchedTable() {
   });
   tbody.querySelectorAll('[data-mail]').forEach(b => b.addEventListener('click', () => sendInviteEmail(+b.dataset.mail)));
   tbody.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyInviteEmail(+b.dataset.copy, b)));
+  tbody.querySelectorAll('[data-reoffer]').forEach(b => b.addEventListener('click', () => reofferSlots(+b.dataset.reoffer)));
   tbody.querySelectorAll('[data-ics]').forEach(b => b.addEventListener('click', () => downloadICS(+b.dataset.ics)));
   tbody.querySelectorAll('[data-respidx]').forEach(sel => {
     sel.addEventListener('change', () => {
@@ -5882,7 +5946,7 @@ function confirmSlot(idx, slotId) {
   const inv = state.sched.invites[idx];
   const slot = slotById(slotId);
   if (!slot || slot.takenBy && slot.takenBy !== inv.candidateName) {
-    notify('That slot has already been confirmed by another candidate. Offer an alternative.', false);
+    notify(`That slot was already confirmed by ${slot ? slot.takenBy : 'another candidate'}. Click 🔄 Re-offer on ${inv.candidateName}'s row to send them 3 fresh slots in one click.`, false);
     return;
   }
   // Release previously confirmed slot if changing choice
@@ -5912,8 +5976,22 @@ function sendInviteEmail(idx) {
   if (!inv.candidateEmail) { notify(`No email address for ${inv.candidateName} — type one into the Email column first.`, false); return; }
   const { subject, body } = buildInviteEmail(inv);
   const organizer = document.getElementById('schedOrganizer').value.trim();
-  const cc = organizer ? `&cc=${encodeURIComponent(organizer)}` : '';
-  window.location.href = `mailto:${encodeURIComponent(inv.candidateEmail)}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
+  const pref = document.getElementById('schedMailClient').value;
+  if (pref === 'web') {
+    // Outlook on the web compose (independent of OS default mail app)
+    const outlookUrl = 'https://outlook.office.com/mail/deeplink/compose'
+      + '?to=' + encodeURIComponent(inv.candidateEmail)
+      + (organizer ? '&cc=' + encodeURIComponent(organizer) : '')
+      + '&subject=' + encodeURIComponent(subject)
+      + '&body=' + encodeURIComponent(body);
+    const win = window.open(outlookUrl, '_blank');
+    if (!win) notify('Popup blocked — allow popups for this site, or switch "Email opens in" to Desktop mail app.', false);
+  } else {
+    // Desktop mail app: mailto opens the OS default client. Set Outlook as the
+    // default mail app on the laptop for this to open desktop Outlook.
+    const cc = organizer ? `&cc=${encodeURIComponent(organizer)}` : '';
+    window.location.href = `mailto:${encodeURIComponent(inv.candidateEmail)}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
+  }
   inv.status = inv.status === 'pending' ? 'invited' : inv.status;
   inv.invitedAt = new Date().toISOString();
   setTimeout(() => { renderSchedTable(); updateSchedCounts(); }, 300);
@@ -5990,6 +6068,75 @@ function downloadICS(idx) {
   URL.revokeObjectURL(a.href);
 }
 
+/* ── Mail-merge export: send 100 personalized invitations in ONE Outlook send ── */
+document.getElementById('schedMergeBtn').addEventListener('click', () => {
+  const pending = state.sched.invites.filter(i => i.status === 'pending' || i.status === 'invited');
+  if (pending.length === 0) { notify('No pending invitations to export — assign slots first.', false); return; }
+  const duration = document.getElementById('schedDuration').value;
+  const location = document.getElementById('schedLocation').value.trim() || 'Microsoft Teams (link to follow)';
+  const wb = XLSX.utils.book_new();
+  const rows = pending.map(inv => {
+    const slots = inv.slotIds.map(slotById).filter(Boolean);
+    return {
+      'Email': inv.candidateEmail,
+      'FirstName': (inv.candidateName || '').split(' ')[0],
+      'FullName': inv.candidateName,
+      'Role': inv.role,
+      'Option1': slots[0] ? fmtSlot(slots[0]) : '',
+      'Option2': slots[1] ? fmtSlot(slots[1]) : '',
+      'Option3': slots[2] ? fmtSlot(slots[2]) : '',
+      'Duration': duration + ' minutes',
+      'Location': location,
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 22 }, { wch: 26 }, { wch: 40 }, { wch: 40 }, { wch: 40 }, { wch: 12 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'MailMerge');
+
+  const help = XLSX.utils.aoa_to_sheet([
+    ['HOW TO SEND ALL INVITATIONS IN ONE GO (Outlook Mail Merge)'],
+    [''],
+    ['1', 'Open Microsoft Word → Mailings tab → Start Mail Merge → E-mail Messages'],
+    ['2', 'Select Recipients → Use an Existing List → choose this file (MailMerge sheet)'],
+    ['3', 'Write the invitation once, using Insert Merge Field for FirstName, Role, Option1, Option2, Option3, Duration, Location'],
+    ['4', 'Finish & Merge → Send Email Messages → To: Email · Subject: Interview Invitation — your role name'],
+    ['5', 'Outlook (desktop) sends one personalized email per candidate — 100 candidates, one click'],
+    [''],
+    ['Tip', 'Everyone exported is marked as Invited in TalentScope automatically; record replies as they come in.'],
+  ]);
+  help['!cols'] = [{ wch: 5 }, { wch: 100 }];
+  XLSX.utils.book_append_sheet(wb, help, 'How To Send');
+  XLSX.writeFile(wb, `TalentScope_MailMerge_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  const marked = pending.filter(i => i.status === 'pending');
+  marked.forEach(i => { i.status = 'invited'; i.invitedAt = new Date().toISOString(); });
+  if (marked.length) { renderSchedTable(); updateSchedCounts(); }
+  notify(`Mail-merge file exported for ${pending.length} candidate(s) — see the "How To Send" tab inside for the one-click Outlook send.`, false);
+});
+
+/* ── Re-offer: one click to hand a candidate 3 fresh slots after a conflict/decline ── */
+function reofferSlots(idx) {
+  const inv = state.sched.invites[idx];
+  releaseSlots(inv);
+  inv.slotIds.forEach(id => {
+    const s = slotById(id);
+    if (s) s.heldBy = s.heldBy.filter(n => n !== inv.candidateName);
+  });
+  const pool = freeSlots();
+  const chosen = [];
+  for (const slot of pool) {
+    if (chosen.length >= 3) break;
+    if (!chosen.some(c => c.date === slot.date) || pool.length <= 3) chosen.push(slot);
+  }
+  for (const slot of pool) { if (chosen.length >= 3) break; if (!chosen.includes(slot)) chosen.push(slot); }
+  if (chosen.length === 0) { notify('No free slots left to offer — upload more interviewer availability first.', false); return; }
+  chosen.forEach(s => s.heldBy.push(inv.candidateName));
+  inv.slotIds = chosen.map(s => s.id);
+  inv.confirmedSlotId = null;
+  inv.status = 'pending';
+  renderSchedTable(); updateSchedCounts();
+  notify(`${inv.candidateName} re-offered ${chosen.length} fresh slot(s) — click ✉ Email to send the new invitation.`, false);
+}
+
 /* ── Consolidated scheduling report ── */
 document.getElementById('schedExportBtn').addEventListener('click', () => {
   if (state.sched.invites.length === 0) return;
@@ -6027,6 +6174,7 @@ function updateSchedCounts() {
   document.getElementById('schedConfirmed').textContent = confirmed;
   document.getElementById('schedAssignBtn').disabled = !(shortlisted > 0 && state.sched.slots.length > 0);
   document.getElementById('schedExportBtn').disabled = state.sched.invites.length === 0;
+  document.getElementById('schedMergeBtn').disabled = !state.sched.invites.some(i => i.status === 'pending' || i.status === 'invited');
   const st = document.getElementById('schedStatus');
   if (state.sched.invites.length > 0) st.textContent = `${confirmed}/${state.sched.invites.length} confirmed`;
   else if (shortlisted > 0) st.textContent = `${shortlisted} ready to schedule`;
@@ -6064,9 +6212,7 @@ function verdictPill(final) {
 }
 
 function dashHistory() {
-  // Backfill: if the team screened CVs before history existed, seed from current results
-  if (state.history.length === 0 && state.results.length > 0) { recordHistory(); persistSession(); }
-  return state.history;
+  return state.history || [];
 }
 
 function renderDashboard() {
@@ -6150,8 +6296,42 @@ function renderCandStatus() {
         <td>${verdictPill(h.final)}</td>
         <td style="font-size:12px; max-width:320px;">${h.reason}</td>
       </tr>`).join('')}</tbody>
-    </table></div></div>${schedLine}`;
+    </table></div></div>${schedLine}
+    <div style="margin-top:10px;">
+      <button class="btn-clear" id="dashDeleteProfile">🗑 Delete this profile (all records)</button>
+    </div>`;
+  const delBtn = document.getElementById('dashDeleteProfile');
+  if (delBtn) delBtn.addEventListener('click', () => deleteProfile(name));
 }
+
+function deleteProfile(name) {
+  if (!confirm(`Delete "${name}" everywhere?\n\nThis removes all their screening history records, current results, and any interview invitation. This cannot be undone.`)) return;
+  state.history = (state.history || []).filter(h => h.name !== name);
+  state.results = state.results.filter(r => (r.name || r.filename) !== name);
+  // Release any held/confirmed slots and drop the invitation
+  const inv = state.sched.invites.find(i => i.candidateName === name);
+  if (inv) {
+    releaseSlots(inv);
+    inv.slotIds.forEach(id => {
+      const s = slotById(id);
+      if (s) s.heldBy = s.heldBy.filter(n => n !== name);
+    });
+    state.sched.invites = state.sched.invites.filter(i => i.candidateName !== name);
+  }
+  renderResults();
+  renderSchedTable();
+  renderDashboard();
+  notify(`"${name}" removed from history, results, and scheduling.`, false);
+}
+
+document.getElementById('dashClearAll').addEventListener('click', () => {
+  const n = (state.history || []).length;
+  if (n === 0) { notify('History is already empty.', false); return; }
+  if (!confirm(`Clear ALL screening history (${n} records)?\n\nThe by-role statistics and candidate lookup will reset for the whole team. Current on-screen results are kept. This cannot be undone.`)) return;
+  state.history = [];
+  renderDashboard();
+  persistSession();
+});
 
 document.getElementById('dashRoleSelect').addEventListener('change', populateCandDropdown);
 document.getElementById('dashCandSelect').addEventListener('change', renderCandStatus);
