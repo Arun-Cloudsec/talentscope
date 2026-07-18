@@ -14,7 +14,7 @@
 <script>
 /* Build stamp + fatal-error banner. This runs before the app script, so even a
    crash during page load produces a visible red banner instead of silence. */
-window.__TS_BUILD = '2026-07-18.1';
+window.__TS_BUILD = '2026-07-18.2';
 window.addEventListener('error', function (e) {
   try {
     if (document.getElementById('tsFatalBanner')) return;
@@ -3096,7 +3096,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
       </div>
       <nav class="main-nav">
         <a class="active" data-view="screening">Screening</a>
-        <a data-scroll="panelJD">Roles</a>
+        <a data-view="roles">Roles</a>
         <a data-view="dashboard">Candidates</a>
         <a data-scroll="panelReports">Reports</a>
         <a data-scroll="panelDeptMatch">Find Matches</a>
@@ -3144,67 +3144,28 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <div class="panel__head">
           <div class="panel__title">
             <span class="panel__number">§ 01</span>
-            <span class="panel__name">The <em>Job</em></span>
+            <span class="panel__name">The <em>Role</em></span>
           </div>
           <span class="panel__count" id="jdStatus">Not set</span>
         </div>
         <p class="panel__desc">
-          Pick a department and role below. Each role keeps its own job description — upload it once and it's reused for every future screening; you don't need to re-upload it per candidate.
+          Pick the department and role you're screening for. JDs are managed once, on the
+          <a href="#" id="goToRolesLink" style="text-decoration:underline; font-weight:600;">Roles</a> tab —
+          this page is just for picking which one to screen against and uploading CVs.
         </p>
 
         <div class="role-picker">
           <div class="sched-field">
             <label>Department</label>
-            <select id="deptSelect"></select>
+            <select id="screenDeptSelect"></select>
           </div>
           <div class="sched-field">
             <label>Role</label>
-            <select id="roleSelect"></select>
+            <select id="screenRoleSelect"></select>
           </div>
         </div>
 
-        <div class="jd-role-status" id="jdRoleStatus">Select a department and role.</div>
-
-        <div class="divider" id="jdUploadDivider">Upload / replace this role's JD</div>
-
-        <label class="drop-zone" id="jdDropZone">
-          <input type="file" id="jdFile" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.eml,.rtf,.md">
-          <div class="drop-zone__icon">📄</div>
-          <div class="drop-zone__text">Drop job description file here</div>
-          <div class="drop-zone__sub">or click to browse</div>
-        </label>
-
-        <div class="divider">Or paste text</div>
-
-        <textarea id="jdText" placeholder="Paste the full job description here — responsibilities, required skills, years of experience, qualifications, and any must-haves. The more detail, the sharper the screening."></textarea>
-        <div style="margin-top:8px; text-align:right;">
-          <button class="sched-mini-btn" id="jdSaveBtn">💾 Save JD to this role</button>
-        </div>
-
-        <div class="jd-preview" id="jdPreview">
-          <div class="jd-preview__ok">✓</div>
-          <div class="jd-preview__info">
-            <div class="jd-preview__name" id="jdPreviewName">—</div>
-            <div class="jd-preview__meta" id="jdPreviewMeta">—</div>
-          </div>
-          <button class="jd-preview__clear" id="jdClear">×</button>
-        </div>
-
-        <div class="dept-admin">
-          <button class="dept-admin__toggle" id="deptAdminToggle">⚙ Manage departments &amp; roles</button>
-          <div class="dept-admin__body" id="deptAdminBody">
-            <div class="dept-admin__row">
-              <input type="text" id="newDeptName" placeholder="New department name (e.g. Marketing)">
-              <button class="sched-mini-btn" id="addDeptBtn">+ Add department</button>
-            </div>
-            <div class="dept-admin__row">
-              <select id="newRoleDeptSelect" style="flex:1; min-width:140px; padding:7px 10px; border:1px solid var(--line-2); border-radius:var(--r-sm); font-size:13px;"></select>
-              <input type="text" id="newRoleName" placeholder="New role name (e.g. ASR Engineer)">
-              <button class="sched-mini-btn" id="addRoleBtn">+ Add role</button>
-            </div>
-            <div class="dept-list" id="deptList"></div>
-          </div>
-        </div>
+        <div class="jd-role-status" id="screenJdStatus">Select a department and role.</div>
       </section>
 
       <section class="panel" id="panelCandidates">
@@ -3365,8 +3326,8 @@ tbody td { padding: 14px 16px; vertical-align: top; }
           <select id="reportStatusSelect">
             <option value="">All statuses</option>
             <option value="approved">Approved</option>
-            <option value="borderline">Under review</option>
-            <option value="rejected">Not selected / Rejected</option>
+            <option value="hold">On Hold</option>
+            <option value="rejected">Rejected</option>
           </select>
         </div>
         <button class="btn-export" id="reportExportCsv">⬇ Export CSV</button>
@@ -3523,6 +3484,45 @@ tbody td { padding: 14px 16px; vertical-align: top; }
     <section class="panel">
       <div class="panel__head">
         <div class="panel__title">
+          <span class="panel__number">§ P</span>
+          <span class="panel__name">All <em>Profiles</em></span>
+        </div>
+        <span class="panel__count" id="profileCount">0 profiles</span>
+      </div>
+      <p class="panel__desc">Every profile in the database — filter by department, role, or status, or search by name, email, or phone. Update a candidate's status or leave a comment right from this list.</p>
+      <div class="report-toolbar">
+        <div class="sched-field">
+          <label>Department</label>
+          <select id="profDeptSelect"><option value="">All departments</option></select>
+        </div>
+        <div class="sched-field">
+          <label>Status</label>
+          <select id="profStatusSelect">
+            <option value="">All statuses</option>
+            <option value="approved">Approved</option>
+            <option value="hold">On Hold</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="sched-field" style="flex:2; min-width:240px;">
+          <label>Search (name, email, or phone)</label>
+          <input type="text" id="profSearch" placeholder="e.g. jane@company.com">
+        </div>
+      </div>
+      <div class="results-table"><div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Candidate</th><th>Email</th><th>Phone</th><th>Department</th><th>Role</th>
+            <th>Status</th><th>Score</th><th>Screened</th><th>Comments</th>
+          </tr></thead>
+          <tbody id="profileBody"></tbody>
+        </table>
+      </div></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
           <span class="panel__number">§ R</span>
           <span class="panel__name">By <em>Role</em></span>
         </div>
@@ -3531,7 +3531,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <div class="table-scroll">
           <table>
             <thead>
-              <tr><th>Role</th><th>CVs Uploaded</th><th>Approved</th><th>Rejected</th><th>Borderline</th><th>Approval Rate</th><th>Last Screening</th></tr>
+              <tr><th>Role</th><th>CVs Uploaded</th><th>Approved</th><th>Rejected</th><th>On Hold</th><th>Approval Rate</th><th>Last Screening</th></tr>
             </thead>
             <tbody id="dashRoleBody"></tbody>
           </table>
@@ -3558,6 +3558,101 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         </div>
       </div>
       <div id="dashCandStatus" style="margin-top:6px;"></div>
+    </section>
+
+  </div>
+
+  <!-- ═══ JD LIBRARY / ROLES ═══ -->
+  <div class="page" id="viewRoles" style="display:none;">
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ J</span>
+          <span class="panel__name">JD <em>Library</em></span>
+        </div>
+        <span class="panel__count" id="jdLibStatus">Not set</span>
+      </div>
+      <p class="panel__desc">
+        Pick a department and role, then upload or paste that role's job description — once saved, it's reused for every future screening. Select roles for actual screening from the <b>Screening</b> page; this tab is just for keeping every JD up to date.
+      </p>
+
+      <div class="role-picker">
+        <div class="sched-field">
+          <label>Department</label>
+          <select id="deptSelect"></select>
+        </div>
+        <div class="sched-field">
+          <label>Role</label>
+          <select id="roleSelect"></select>
+        </div>
+      </div>
+
+      <div class="jd-role-status" id="jdRoleStatus">Select a department and role.</div>
+
+      <div class="divider" id="jdUploadDivider">Upload / replace this role's JD</div>
+
+      <label class="drop-zone" id="jdDropZone">
+        <input type="file" id="jdFile" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.eml,.rtf,.md">
+        <div class="drop-zone__icon">📄</div>
+        <div class="drop-zone__text">Drop job description file here</div>
+        <div class="drop-zone__sub">or click to browse</div>
+      </label>
+
+      <div class="divider">Or paste text</div>
+
+      <textarea id="jdText" placeholder="Paste the full job description here — responsibilities, required skills, years of experience, qualifications, and any must-haves. The more detail, the sharper the screening."></textarea>
+      <div style="margin-top:8px; text-align:right;">
+        <button class="sched-mini-btn" id="jdSaveBtn">💾 Save JD to this role</button>
+      </div>
+
+      <div class="jd-preview" id="jdPreview">
+        <div class="jd-preview__ok">✓</div>
+        <div class="jd-preview__info">
+          <div class="jd-preview__name" id="jdPreviewName">—</div>
+          <div class="jd-preview__meta" id="jdPreviewMeta">—</div>
+        </div>
+        <button class="jd-preview__clear" id="jdClear">×</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ +</span>
+          <span class="panel__name">Add / Delete / Update <em>Departments &amp; Roles</em></span>
+        </div>
+      </div>
+      <p class="panel__desc">Add a new department or role, rename one by deleting and re-adding it, or remove one you no longer need.</p>
+      <div class="dept-admin__row">
+        <input type="text" id="newDeptName" placeholder="New department name (e.g. Marketing)">
+        <button class="sched-mini-btn" id="addDeptBtn">+ Add department</button>
+      </div>
+      <div class="dept-admin__row">
+        <select id="newRoleDeptSelect" style="flex:1; min-width:140px; padding:7px 10px; border:1px solid var(--line-2); border-radius:var(--r-sm); font-size:13px;"></select>
+        <input type="text" id="newRoleName" placeholder="New role name (e.g. ASR Engineer)">
+        <button class="sched-mini-btn" id="addRoleBtn">+ Add role</button>
+      </div>
+      <div class="dept-list" id="deptList"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ D</span>
+          <span class="panel__name">Roles <em>Dashboard</em></span>
+        </div>
+        <span class="panel__count" id="rolesDashCount">0 roles</span>
+      </div>
+      <p class="panel__desc">Every role across every department — JD status and screening activity at a glance.</p>
+      <div class="results-table"><div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Department</th><th>Role</th><th>JD</th><th>Screened</th><th>Approved</th><th>On Hold</th><th>Rejected</th><th>Last activity</th>
+          </tr></thead>
+          <tbody id="rolesDashBody"></tbody>
+        </table>
+      </div></div>
     </section>
 
   </div>
@@ -4065,6 +4160,11 @@ function showView(viewName) {
     dash.style.display = viewName === 'dashboard' ? '' : 'none';
     if (viewName === 'dashboard' && typeof renderDashboard === 'function') renderDashboard();
   }
+  const roles = document.getElementById('viewRoles');
+  if (roles) {
+    roles.style.display = viewName === 'roles' ? '' : 'none';
+    if (viewName === 'roles' && typeof renderRolesDashboard === 'function') { renderDeptRoleSelects(); renderRolesDashboard(); }
+  }
   document.querySelectorAll('.main-nav a[data-view]').forEach(a => {
     a.classList.toggle('active', a.dataset.view === viewName);
   });
@@ -4332,19 +4432,26 @@ const jdText = document.getElementById('jdText');
 const jdPreview = document.getElementById('jdPreview');
 const deptSelect = document.getElementById('deptSelect');
 const roleSelect = document.getElementById('roleSelect');
+const screenDeptSelect = document.getElementById('screenDeptSelect');
+const screenRoleSelect = document.getElementById('screenRoleSelect');
 
 function renderDeptRoleSelects() {
   const prevDept = state.selectedDeptId, prevRole = state.selectedRoleId;
-  deptSelect.innerHTML = state.departments.map(d => `<option value="${d.id}">${escHtml(d.name)}</option>`).join('');
-  if (state.departments.some(d => d.id === prevDept)) deptSelect.value = prevDept;
+  const deptOptions = state.departments.map(d => `<option value="${d.id}">${escHtml(d.name)}</option>`).join('');
+  deptSelect.innerHTML = deptOptions;
+  screenDeptSelect.innerHTML = deptOptions;
+  if (state.departments.some(d => d.id === prevDept)) { deptSelect.value = prevDept; screenDeptSelect.value = prevDept; }
   else if (state.departments.length) state.selectedDeptId = state.departments[0].id;
   const dept = findDept(state.selectedDeptId);
   const roles = dept ? dept.roles : [];
-  roleSelect.innerHTML = roles.map(r => `<option value="${r.id}">${escHtml(r.name)}</option>`).join('');
-  if (roles.some(r => r.id === prevRole)) roleSelect.value = prevRole;
+  const roleOptions = roles.map(r => `<option value="${r.id}">${escHtml(r.name)}</option>`).join('');
+  roleSelect.innerHTML = roleOptions;
+  screenRoleSelect.innerHTML = roleOptions;
+  if (roles.some(r => r.id === prevRole)) { roleSelect.value = prevRole; screenRoleSelect.value = prevRole; }
   else if (roles.length) state.selectedRoleId = roles[0].id;
   else state.selectedRoleId = '';
   loadSelectedRoleIntoEditor();
+  renderScreenRoleStatus();
   updateJdStat();
   renderDeptAdminSelects();
 }
@@ -4353,6 +4460,34 @@ function updateJdStat() {
   const total = allRolesFlat().length;
   const withJd = allRolesFlat().filter(x => x.role.jdText).length;
   document.getElementById('statRoles').textContent = `${withJd}/${total}`;
+}
+
+/* Read-only status line + badge shown on the Screening page (§01) — no upload here,
+   just "here's what you're screening against", with a link to go manage it. */
+function renderScreenRoleStatus() {
+  const dept = findDept(state.selectedDeptId);
+  const role = currentRole();
+  const el = document.getElementById('screenJdStatus');
+  const badge = document.getElementById('jdStatus');
+  if (!el || !badge) return;
+  if (!role) {
+    el.textContent = 'No roles yet — set one up on the Roles tab.';
+    el.classList.add('empty');
+    badge.textContent = 'Not set';
+    return;
+  }
+  if (role.jdText) {
+    const when = role.jdSetAt ? new Date(role.jdSetAt).toLocaleDateString() : '';
+    el.innerHTML = `Screening against <b>${escHtml(dept.name)} · ${escHtml(role.name)}</b> — JD on file${when ? ' · saved ' + when : ''}.`;
+    el.classList.remove('empty');
+    badge.innerHTML = '<b>Loaded</b>';
+  } else {
+    el.innerHTML = `<b>${escHtml(dept ? dept.name : '')} · ${escHtml(role.name)}</b> has no JD yet — <a href="#" id="screenGoRolesLink" style="text-decoration:underline; font-weight:600;">add one on the Roles tab</a> before screening.`;
+    el.classList.add('empty');
+    badge.textContent = 'Not set';
+    const link = document.getElementById('screenGoRolesLink');
+    if (link) link.addEventListener('click', e => { e.preventDefault(); showView('roles'); });
+  }
 }
 
 function loadSelectedRoleIntoEditor() {
@@ -4390,20 +4525,33 @@ function saveJdToRole(text, name, by) {
   state.jdText = text;
   state.jdName = name;
   loadSelectedRoleIntoEditor();
+  renderScreenRoleStatus();
   updateJdStat();
+  if (typeof renderRolesDashboard === 'function') renderRolesDashboard();
   persistSession();
 }
 
-deptSelect.addEventListener('change', () => {
-  state.selectedDeptId = deptSelect.value;
+function onDeptChanged(newDeptId) {
+  state.selectedDeptId = newDeptId;
   const dept = findDept(state.selectedDeptId);
   state.selectedRoleId = dept && dept.roles.length ? dept.roles[0].id : '';
   renderDeptRoleSelects();
-});
+}
+deptSelect.addEventListener('change', () => onDeptChanged(deptSelect.value));
+screenDeptSelect.addEventListener('change', () => onDeptChanged(screenDeptSelect.value));
 roleSelect.addEventListener('change', () => {
   state.selectedRoleId = roleSelect.value;
+  screenRoleSelect.value = roleSelect.value;
   loadSelectedRoleIntoEditor();
+  renderScreenRoleStatus();
 });
+screenRoleSelect.addEventListener('change', () => {
+  state.selectedRoleId = screenRoleSelect.value;
+  roleSelect.value = screenRoleSelect.value;
+  loadSelectedRoleIntoEditor();
+  renderScreenRoleStatus();
+});
+document.getElementById('goToRolesLink').addEventListener('click', e => { e.preventDefault(); showView('roles'); });
 
 setupDropZone(jdDropZone, jdFile, async (files) => {
   const f = files[0];
@@ -4444,7 +4592,9 @@ document.getElementById('jdClear').addEventListener('click', () => {
   jdText.value = '';
   jdFile.value = '';
   loadSelectedRoleIntoEditor();
+  renderScreenRoleStatus();
   updateJdStat();
+  if (typeof renderRolesDashboard === 'function') renderRolesDashboard();
   persistSession();
 });
 
@@ -4453,19 +4603,17 @@ function showJDPreview(name, length) {
   document.getElementById('jdPreviewName').textContent = name;
   document.getElementById('jdPreviewMeta').textContent =
     `${length.toLocaleString()} chars · ~${Math.round(length / 5).toLocaleString()} words`;
-  document.getElementById('jdStatus').innerHTML = '<b>Loaded</b>';
+  const libBadge = document.getElementById('jdLibStatus');
+  if (libBadge) libBadge.innerHTML = '<b>Loaded</b>';
   updateRunButton();
 }
 function hideJDPreview() {
   jdPreview.classList.remove('visible');
-  document.getElementById('jdStatus').textContent = 'Not set';
+  const libBadge = document.getElementById('jdLibStatus');
+  if (libBadge) libBadge.textContent = 'Not set';
 }
 
-/* ═══ DEPARTMENT / ROLE ADMIN ═══ */
-document.getElementById('deptAdminToggle').addEventListener('click', () => {
-  document.getElementById('deptAdminBody').classList.toggle('open');
-});
-
+/* ═══ DEPARTMENT / ROLE ADMIN (always visible on the Roles tab) ═══ */
 function renderDeptAdminSelects() {
   const sel = document.getElementById('newRoleDeptSelect');
   const prev = sel.value;
@@ -4499,6 +4647,7 @@ function renderDeptList() {
     state.departments = state.departments.filter(x => x.id !== d.id);
     if (state.selectedDeptId === d.id) state.selectedDeptId = state.departments[0]?.id || '';
     renderDeptRoleSelects();
+    renderRolesDashboard();
     persistSession();
   }));
   el.querySelectorAll('.role-del').forEach(btn => btn.addEventListener('click', () => {
@@ -4509,6 +4658,7 @@ function renderDeptList() {
     d.roles = d.roles.filter(x => x.id !== r.id);
     if (state.selectedRoleId === r.id) state.selectedRoleId = d.roles[0]?.id || '';
     renderDeptRoleSelects();
+    renderRolesDashboard();
     persistSession();
   }));
 }
@@ -4520,7 +4670,7 @@ document.getElementById('addDeptBtn').addEventListener('click', () => {
   state.departments.push({ id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, roles: [] });
   input.value = '';
   renderDeptRoleSelects();
-  renderReportDeptSelect(); renderMatchDeptSelect();
+  renderReportDeptSelect(); renderMatchDeptSelect(); renderProfDeptSelect(); renderRolesDashboard();
   persistSession();
 });
 
@@ -4533,9 +4683,39 @@ document.getElementById('addRoleBtn').addEventListener('click', () => {
   dept.roles.push({ id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, jdText: '', jdName: '', jdSetAt: '', jdSetBy: '' });
   nameInput.value = '';
   renderDeptRoleSelects();
-  renderReportDeptSelect(); renderMatchDeptSelect();
+  renderReportDeptSelect(); renderMatchDeptSelect(); renderProfDeptSelect(); renderRolesDashboard();
   persistSession();
 });
+
+/* ═══ ROLES DASHBOARD (by department) ═══ */
+function renderRolesDashboard() {
+  const body = document.getElementById('rolesDashBody');
+  const countEl = document.getElementById('rolesDashCount');
+  if (!body) return;
+  const flat = allRolesFlat();
+  if (countEl) countEl.textContent = `${flat.length} role${flat.length !== 1 ? 's' : ''}`;
+  if (flat.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" style="opacity:0.6;">No departments/roles yet — add one above.</td></tr>';
+    return;
+  }
+  body.innerHTML = flat.map(({ dept, role }) => {
+    const recs = (state.history || []).filter(h => h.dept === dept.name && (h.roleName === role.name || h.role === role.name));
+    const approved = recs.filter(h => historyStatus(h) === 'approved').length;
+    const hold = recs.filter(h => historyStatus(h) === 'hold').length;
+    const rejected = recs.filter(h => historyStatus(h) === 'rejected').length;
+    const last = recs.length ? new Date(Math.max(...recs.map(h => +new Date(h.ts)))).toLocaleDateString() : '—';
+    return `<tr>
+      <td>${escHtml(dept.name)}</td>
+      <td><b>${escHtml(role.name)}</b></td>
+      <td><span class="role-row__jd ${role.jdText ? 'set' : 'unset'}">${role.jdText ? 'Saved' : 'No JD'}</span></td>
+      <td>${recs.length}</td>
+      <td style="color:var(--approved); font-weight:700;">${approved}</td>
+      <td style="color:var(--borderline); font-weight:700;">${hold}</td>
+      <td style="color:var(--rejected); font-weight:700;">${rejected}</td>
+      <td style="font-size:12px;">${last}</td>
+    </tr>`;
+  }).join('');
+}
 
 renderDeptRoleSelects();
 
@@ -6734,6 +6914,50 @@ function showSchedulingIfReady() {
 /* ═══════════════════════════ TALENT DASHBOARD (all-time history) ═══════════════════════════ */
 state.history = state.history || [];
 
+/* ═══ HISTORY STATUS / COMMENTS — HR-editable overlay on top of the AI verdict ═══ */
+function mapFinalToStatus(final) {
+  if (final === 'approved') return 'approved';
+  if (final === 'rejected') return 'rejected';
+  return 'hold'; // borderline / error / anything else needs a human decision
+}
+function historyStatus(h) { return h.status || mapFinalToStatus(h.final); }
+const STATUS_LABEL = { approved: 'Approved ✓', rejected: 'Rejected ✕', hold: 'On Hold ⏸' };
+const STATUS_COLOR = { approved: 'var(--approved)', rejected: 'var(--rejected)', hold: 'var(--borderline)' };
+function statusPill(status) {
+  return `<span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; color:#fff; background:${STATUS_COLOR[status] || '#888'};">${STATUS_LABEL[status] || status}</span>`;
+}
+function statusSelectHTML(hid, status) {
+  return `<select class="emp-id-input status-select" data-hid="${hid}" style="width:120px;">
+    ${['approved', 'hold', 'rejected'].map(v => `<option value="${v}" ${v === status ? 'selected' : ''}>${STATUS_LABEL[v]}</option>`).join('')}
+  </select>`;
+}
+let _histIdSeq = 1;
+function newHid() { return 'h' + Date.now().toString(36) + (_histIdSeq++) + Math.random().toString(36).slice(2, 5); }
+function migrateHistory() {
+  (state.history || []).forEach(h => {
+    if (!h.hid) h.hid = newHid();
+    if (!h.status) h.status = mapFinalToStatus(h.final);
+    if (h.phone === undefined) h.phone = '';
+    if (!Array.isArray(h.comments)) h.comments = [];
+  });
+}
+function findHistoryByHid(hid) { return (state.history || []).find(h => h.hid === hid); }
+function updateHistoryStatus(hid, status) {
+  const h = findHistoryByHid(hid);
+  if (!h) return;
+  h.status = status;
+  persistSession();
+  renderReport(); renderProfiles(); renderRolesDashboard();
+}
+function addHistoryComment(hid, text) {
+  const h = findHistoryByHid(hid);
+  if (!h || !text.trim()) return;
+  h.comments = h.comments || [];
+  h.comments.push({ text: text.trim(), by: (state.user && state.user.fullName) || 'HR user', at: new Date().toISOString() });
+  persistSession();
+}
+migrateHistory();
+
 function recordHistory() {
   const runTs = new Date().toISOString();
   const dept = findDept(state.selectedDeptId);
@@ -6742,16 +6966,20 @@ function recordHistory() {
   state.results.forEach(r => {
     const cand = state.candidates.find(c => c.id === r.id);
     state.history.push({
+      hid: newHid(),
       ts: runTs,
       dept: dept ? dept.name : 'Unspecified department',
       roleName: roleObj ? roleObj.name : role,
       role,
       name: r.name || r.filename,
       email: r.email && r.email !== '—' ? r.email : '',
+      phone: r.phone && r.phone !== '—' ? r.phone : '',
       employeeId: '',                       // fillable later from the Department Reports table
       uploadedBy: r.uploadedBy || '',
       score: r.score,
       final: r.final,
+      status: mapFinalToStatus(r.final),
+      comments: [],
       reason: r.reason || '',
       altMatches: r.altMatches || [],
       // Keep the résumé text (capped) so future openings can be matched against the
@@ -6760,11 +6988,12 @@ function recordHistory() {
     });
   });
   renderReport();
+  renderProfiles();
+  renderRolesDashboard();
   updateMatchCount();
 }
 
 /* ═══════════════════════════ DEPARTMENT REPORTS ═══════════════════════════ */
-const REPORT_STATUS_LABEL = { approved: 'Approved ✓', rejected: 'Not selected ✕', borderline: 'Under review ⚠', error: 'Error' };
 
 function renderReportDeptSelect() {
   const sel = document.getElementById('reportDeptSelect');
@@ -6782,11 +7011,12 @@ function renderReportDeptSelect() {
 function renderReport() {
   const body = document.getElementById('reportBody');
   if (!body) return;
+  migrateHistory();
   renderReportDeptSelect();
   const deptFilter = document.getElementById('reportDeptSelect').value;
   const statusFilter = document.getElementById('reportStatusSelect').value;
   const rows = (state.history || [])
-    .filter(h => (!deptFilter || h.dept === deptFilter) && (!statusFilter || h.final === statusFilter))
+    .filter(h => (!deptFilter || h.dept === deptFilter) && (!statusFilter || historyStatus(h) === statusFilter))
     .sort((a, b) => new Date(b.ts) - new Date(a.ts));
   document.getElementById('reportCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
   if (rows.length === 0) {
@@ -6794,27 +7024,29 @@ function renderReport() {
     return;
   }
   body.innerHTML = rows.map(h => {
-    const idx = state.history.indexOf(h);
     const alt = (h.altMatches || []).find(a => a.verdict === 'approved');
     const altNote = alt ? `<br><span style="color:var(--approved); font-size:11px;">★ Better fit: ${escHtml(alt.dept)} · ${escHtml(alt.role)} (${alt.score}/100)</span>` : '';
     return `<tr>
       <td><b>${escHtml(h.name)}</b></td>
       <td style="font-size:12px;">${escHtml(h.email || '—')}</td>
-      <td><input class="emp-id-input" data-hidx="${idx}" value="${escHtml(h.employeeId || '')}" placeholder="—"></td>
+      <td><input class="emp-id-input" data-hid="${h.hid}" data-field="employeeId" value="${escHtml(h.employeeId || '')}" placeholder="—"></td>
       <td>${escHtml(h.dept || '—')}</td>
       <td style="font-size:12px;">${escHtml(h.roleName || h.role || '—')}</td>
-      <td>${verdictPill(h.final)}</td>
+      <td>${statusSelectHTML(h.hid, historyStatus(h))}</td>
       <td style="font-size:12px; max-width:300px;">${escHtml(h.reason || '')}${altNote}</td>
       <td style="font-size:12px; white-space:nowrap;">${new Date(h.ts).toLocaleDateString()}<br><span style="opacity:0.6;">${new Date(h.ts).toLocaleTimeString()}</span></td>
       <td style="font-size:12px;">${escHtml(h.uploadedBy || '—')}</td>
     </tr>`;
   }).join('');
   // Employee-ID inline editing (saved to the shared database on change)
-  body.querySelectorAll('.emp-id-input').forEach(inp => {
+  body.querySelectorAll('.emp-id-input[data-field="employeeId"]').forEach(inp => {
     inp.addEventListener('change', () => {
-      const h = state.history[Number(inp.dataset.hidx)];
+      const h = findHistoryByHid(inp.dataset.hid);
       if (h) { h.employeeId = inp.value.trim(); persistSession(); }
     });
+  });
+  body.querySelectorAll('.status-select').forEach(sel => {
+    sel.addEventListener('change', () => updateHistoryStatus(sel.dataset.hid, sel.value));
   });
 }
 
@@ -6828,11 +7060,13 @@ function reportRowsForExport(deptFilter) {
     .map(h => ({
       'Candidate Name': h.name,
       'Email ID': h.email || '',
+      'Phone': h.phone || '',
       'Employee ID': h.employeeId || '',
       'Department': h.dept || '',
       'Role': h.roleName || h.role || '',
-      'Status': REPORT_STATUS_LABEL[h.final] || h.final,
+      'Status': STATUS_LABEL[historyStatus(h)] || historyStatus(h),
       'Reason': h.reason || '',
+      'Comments': (h.comments || []).map(c => `${c.by}: ${c.text}`).join(' | '),
       'Screening Completed': new Date(h.ts).toLocaleString(),
       'Uploaded By': h.uploadedBy || '',
       'Better Fit Elsewhere': (h.altMatches || []).filter(a => a.verdict === 'approved').map(a => `${a.dept} · ${a.role} (${a.score}/100)`).join('; '),
@@ -6967,8 +7201,8 @@ function dashHistory() {
 function renderDashboard() {
   const hist = dashHistory();
   const total = hist.length;
-  const count = f => hist.filter(h => h.final === f).length;
-  const approved = count('approved'), rejected = count('rejected'), borderline = count('borderline');
+  const count = s => hist.filter(h => historyStatus(h) === s).length;
+  const approved = count('approved'), rejected = count('rejected'), hold = count('hold');
 
   document.getElementById('dashSince').textContent = total > 0
     ? `${total} CVs since ${new Date(Math.min(...hist.map(h => +new Date(h.ts)))).toLocaleDateString()}`
@@ -6978,14 +7212,14 @@ function renderDashboard() {
     <div class="summary-card"><div class="summary-card__label">Total CVs Uploaded</div><div class="summary-card__num">${total}</div><div class="summary-card__sub">All roles · all time</div></div>
     <div class="summary-card approved"><div class="summary-card__label">Approved</div><div class="summary-card__num">${approved}</div><div class="summary-card__sub">${total ? Math.round(approved / total * 100) : 0}% of all CVs</div></div>
     <div class="summary-card rejected"><div class="summary-card__label">Rejected</div><div class="summary-card__num">${rejected}</div><div class="summary-card__sub">${total ? Math.round(rejected / total * 100) : 0}% of all CVs</div></div>
-    <div class="summary-card borderline"><div class="summary-card__label">Borderline</div><div class="summary-card__num">${borderline}</div><div class="summary-card__sub">Needs human review</div></div>`;
+    <div class="summary-card borderline"><div class="summary-card__label">On Hold</div><div class="summary-card__num">${hold}</div><div class="summary-card__sub">Needs human review</div></div>`;
 
   const roles = {};
   hist.forEach(h => {
-    if (!roles[h.role]) roles[h.role] = { total: 0, approved: 0, rejected: 0, borderline: 0, last: h.ts };
+    if (!roles[h.role]) roles[h.role] = { total: 0, approved: 0, rejected: 0, hold: 0, last: h.ts };
     const R = roles[h.role];
     R.total++;
-    if (R[h.final] !== undefined) R[h.final]++;
+    R[historyStatus(h)]++;
     if (h.ts > R.last) R.last = h.ts;
   });
   const roleBody = document.getElementById('dashRoleBody');
@@ -6996,7 +7230,7 @@ function renderDashboard() {
       <td>${R.total}</td>
       <td style="color:var(--approved); font-weight:700;">${R.approved}</td>
       <td style="color:var(--rejected); font-weight:700;">${R.rejected}</td>
-      <td style="color:var(--borderline); font-weight:700;">${R.borderline}</td>
+      <td style="color:var(--borderline); font-weight:700;">${R.hold}</td>
       <td>${R.total ? Math.round(R.approved / R.total * 100) : 0}%</td>
       <td style="font-size:12px;">${new Date(R.last).toLocaleDateString()}</td>
     </tr>`).join('') || '<tr><td colspan="7" style="opacity:0.6;">Run a screening and every CV will be tracked here.</td></tr>';
@@ -7007,6 +7241,7 @@ function renderDashboard() {
     Object.keys(roles).sort().map(r => `<option value="${r.replace(/"/g, '&quot;')}">${r}</option>`).join('');
   if ([...roleSel.options].some(o => o.value === prevRole)) roleSel.value = prevRole;
   populateCandDropdown();
+  renderProfiles();
 }
 
 function populateCandDropdown() {
@@ -7042,7 +7277,7 @@ function renderCandStatus() {
         <td>${h.role}</td>
         <td style="font-size:12px;">${new Date(h.ts).toLocaleString()}</td>
         <td><b>${h.score ?? '—'}</b></td>
-        <td>${verdictPill(h.final)}</td>
+        <td>${statusPill(historyStatus(h))}</td>
         <td style="font-size:12px; max-width:320px;">${h.reason}</td>
       </tr>`).join('')}</tbody>
     </table></div></div>${schedLine}
@@ -7052,6 +7287,93 @@ function renderCandStatus() {
   const delBtn = document.getElementById('dashDeleteProfile');
   if (delBtn) delBtn.addEventListener('click', () => deleteProfile(name));
 }
+
+/* ═══════════════════════════ ALL PROFILES (filterable, searchable database view) ═══════════════════════════ */
+function renderProfDeptSelect() {
+  const sel = document.getElementById('profDeptSelect');
+  if (!sel) return;
+  const prev = sel.value;
+  const names = [...new Set([
+    ...state.departments.map(d => d.name),
+    ...(state.history || []).map(h => h.dept).filter(Boolean),
+  ])].sort();
+  sel.innerHTML = '<option value="">All departments</option>' +
+    names.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${escHtml(n)}</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+}
+
+function renderProfiles() {
+  const body = document.getElementById('profileBody');
+  if (!body) return;
+  migrateHistory();
+  renderProfDeptSelect();
+  const dept = document.getElementById('profDeptSelect').value;
+  const status = document.getElementById('profStatusSelect').value;
+  const q = (document.getElementById('profSearch').value || '').toLowerCase().trim();
+  const rows = (state.history || [])
+    .filter(h => (!dept || h.dept === dept) && (!status || historyStatus(h) === status))
+    .filter(h => !q || [h.name, h.email, h.phone].some(v => (v || '').toLowerCase().includes(q)))
+    .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  document.getElementById('profileCount').textContent = `${rows.length} profile${rows.length !== 1 ? 's' : ''}`;
+  if (rows.length === 0) {
+    body.innerHTML = '<tr><td colspan="9" style="opacity:0.6;">No matching profiles yet.</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(h => {
+    const n = (h.comments || []).length;
+    return `<tr data-hid="${h.hid}">
+      <td><b>${escHtml(h.name)}</b></td>
+      <td style="font-size:12px;">${escHtml(h.email || '—')}</td>
+      <td style="font-size:12px;">${escHtml(h.phone || '—')}</td>
+      <td>${escHtml(h.dept || '—')}</td>
+      <td style="font-size:12px;">${escHtml(h.roleName || h.role || '—')}</td>
+      <td>${statusSelectHTML(h.hid, historyStatus(h))}</td>
+      <td><b>${h.score ?? '—'}</b></td>
+      <td style="font-size:12px; white-space:nowrap;">${new Date(h.ts).toLocaleDateString()}</td>
+      <td><button class="sched-mini-btn comment-toggle" data-hid="${h.hid}">💬 ${n}</button></td>
+    </tr>
+    <tr class="comments-row" data-hid-row="${h.hid}" style="display:none;">
+      <td colspan="9" style="background:rgba(0,0,0,0.02);">
+        <div class="comments-list" data-hid="${h.hid}" style="font-size:12px; margin-bottom:8px;">
+          ${(h.comments || []).map(c => `<div style="margin-bottom:4px;"><b>${escHtml(c.by)}</b> · <span style="opacity:0.6;">${new Date(c.at).toLocaleString()}</span><br>${escHtml(c.text)}</div>`).join('') || '<div style="opacity:0.6;">No comments yet.</div>'}
+        </div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" class="comment-input" data-hid="${h.hid}" placeholder="Add a comment…" style="flex:1; padding:6px 9px; border:1px solid var(--line-2); border-radius:var(--r-sm); font-size:12.5px;">
+          <button class="sched-mini-btn comment-add" data-hid="${h.hid}">Add</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  body.querySelectorAll('.status-select').forEach(sel => {
+    sel.addEventListener('change', () => updateHistoryStatus(sel.dataset.hid, sel.value));
+  });
+  body.querySelectorAll('.comment-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = body.querySelector(`.comments-row[data-hid-row="${btn.dataset.hid}"]`);
+      if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+    });
+  });
+  body.querySelectorAll('.comment-add').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = body.querySelector(`.comment-input[data-hid="${btn.dataset.hid}"]`);
+      if (!input || !input.value.trim()) return;
+      addHistoryComment(btn.dataset.hid, input.value);
+      renderProfiles();
+    });
+  });
+  body.querySelectorAll('.comment-input').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') body.querySelector(`.comment-add[data-hid="${inp.dataset.hid}"]`)?.click();
+    });
+  });
+}
+document.getElementById('profDeptSelect').addEventListener('change', renderProfiles);
+document.getElementById('profStatusSelect').addEventListener('change', renderProfiles);
+document.getElementById('profSearch').addEventListener('input', () => {
+  clearTimeout(window._profSearchDebounce);
+  window._profSearchDebounce = setTimeout(renderProfiles, 150);
+});
 
 function deleteProfile(name) {
   if (!confirm(`Delete "${name}" everywhere?\n\nThis removes all their screening history records, current results, and any interview invitation. This cannot be undone.`)) return;
@@ -7127,6 +7449,7 @@ function applySnapshot(s) {
     state.results = Array.isArray(s.results) ? s.results : [];
     state.jdName = s.jdName || state.jdName;
     state.history = Array.isArray(s.history) ? s.history : (state.history || []);
+    migrateHistory();
     if (Array.isArray(s.departments) && s.departments.length > 0) {
       state.departments = s.departments;
       if (!findDept(state.selectedDeptId)) state.selectedDeptId = state.departments[0]?.id || '';
@@ -7136,6 +7459,7 @@ function applySnapshot(s) {
     if (s.sched) state.sched = Object.assign({ slots: [], invites: [], availFileName: '' }, s.sched);
     if (state.results.length > 0) renderResults();
     renderReport();
+    renderProfiles();
     renderMatchDeptSelect();
     updateMatchCount();
     if (state.sched.availFileName) {
@@ -7221,6 +7545,7 @@ function clearSavedSession() { try { localStorage.removeItem('ts_session'); } ca
 
 // Initial paint of the new department-driven panels
 renderReport();
+renderProfiles();
 renderMatchDeptSelect();
 updateMatchCount();
 applyGuestRestrictions();
