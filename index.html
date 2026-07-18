@@ -15,7 +15,7 @@
 <script>
 /* Build stamp + fatal-error banner. This runs before the app script, so even a
    crash during page load produces a visible red banner instead of silence. */
-window.__TS_BUILD = '2026-07-18.5';
+window.__TS_BUILD = '2026-07-18.7';
 window.addEventListener('error', function (e) {
   try {
     if (document.getElementById('tsFatalBanner')) return;
@@ -3131,7 +3131,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <a data-view="roles">Roles</a>
         <a data-view="pipeline">Pipeline</a>
         <a data-view="dashboard">Candidates</a>
-        <a data-scroll="panelReports">Reports</a>
+        <a data-view="reports">Reports</a>
         <a data-scroll="panelDeptMatch">Find Matches</a>
         <a data-view="guide">Guide</a>
       </nav>
@@ -3338,46 +3338,6 @@ tbody td { padding: 14px 16px; vertical-align: top; }
     </div>
 
     <!-- ═══ DEPARTMENT REPORTS (all-time, across every screening run) ═══ -->
-    <section class="panel" id="panelReports">
-      <div class="panel__head">
-        <div class="panel__title">
-          <span class="panel__number">§ R</span>
-          <span class="panel__name">Department <em>Reports</em></span>
-        </div>
-        <span class="panel__count" id="reportCount">0 records</span>
-      </div>
-      <p class="panel__desc">
-        Every candidate ever screened, grouped by department — name, email, employee ID, status, reason, and completion date. Export per department or all at once.
-      </p>
-      <div class="report-toolbar">
-        <div class="sched-field">
-          <label>Department</label>
-          <select id="reportDeptSelect"><option value="">All departments</option></select>
-        </div>
-        <div class="sched-field">
-          <label>Status</label>
-          <select id="reportStatusSelect">
-            <option value="">All statuses</option>
-            <option value="approved">Approved</option>
-            <option value="hold">On Hold</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-        <button class="btn-export" id="reportExportCsv">⬇ Export CSV</button>
-        <button class="btn-export" id="reportExportXlsx">📗 Export Excel (all departments)</button>
-      </div>
-      <div class="results-table"><div class="table-scroll">
-        <table>
-          <thead><tr>
-            <th>Candidate</th><th>Email</th><th>Employee ID</th><th>Department</th><th>Role</th>
-            <th>Status</th><th>Reason</th><th>Completed</th><th>Uploaded by</th>
-          </tr></thead>
-          <tbody id="reportBody"></tbody>
-        </table>
-      </div></div>
-    </section>
-
-    <!-- ═══ FIND MATCHES IN EXISTING DATABASE (for a new opening) ═══ -->
     <section class="panel" id="panelDeptMatch">
       <div class="panel__head">
         <div class="panel__title">
@@ -3718,6 +3678,52 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         </table>
       </div></div>
     </section>
+
+  </div>
+
+  <!-- ═══ REPORTS ═══ -->
+  <div class="page" id="viewReports" style="display:none;">
+
+    <section class="panel" id="panelReports">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ R</span>
+          <span class="panel__name">Department <em>Reports</em></span>
+        </div>
+        <span class="panel__count" id="reportCount">0 records</span>
+      </div>
+      <p class="panel__desc">
+        Every candidate ever screened, grouped by department — name, email, employee ID, status, reason, and completion date. Export per department or all at once.
+      </p>
+      <div class="report-toolbar">
+        <div class="sched-field">
+          <label>Department</label>
+          <select id="reportDeptSelect"><option value="">All departments</option></select>
+        </div>
+        <div class="sched-field">
+          <label>Status</label>
+          <select id="reportStatusSelect">
+            <option value="">All statuses</option>
+            <option value="approved">Approved</option>
+            <option value="hold">On Hold</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <button class="btn-export" id="reportExportCsv">⬇ Export CSV</button>
+        <button class="btn-export" id="reportExportXlsx">📗 Export Excel (all departments)</button>
+      </div>
+      <div class="results-table"><div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Candidate</th><th>Email</th><th>Employee ID</th><th>Department</th><th>Role</th>
+            <th>Status</th><th>Reason</th><th>Completed</th><th>Uploaded by</th>
+          </tr></thead>
+          <tbody id="reportBody"></tbody>
+        </table>
+      </div></div>
+    </section>
+
+    <!-- ═══ FIND MATCHES IN EXISTING DATABASE (for a new opening) ═══ -->
 
   </div>
 
@@ -4298,6 +4304,11 @@ function showView(viewName) {
     pipe.style.display = viewName === 'pipeline' ? '' : 'none';
     if (viewName === 'pipeline' && typeof renderPipeline === 'function') renderPipeline();
   }
+  const reports = document.getElementById('viewReports');
+  if (reports) {
+    reports.style.display = viewName === 'reports' ? '' : 'none';
+    if (viewName === 'reports' && typeof renderReport === 'function') renderReport();
+  }
   document.querySelectorAll('.main-nav a[data-view]').forEach(a => {
     a.classList.toggle('active', a.dataset.view === viewName);
   });
@@ -4382,19 +4393,57 @@ const state = {
   privacy: { retentionMonths: 0, storeCvText: true },
 };
 
-/* ═══ DEFAULT DEPARTMENTS & ROLES (fully editable via "Manage departments & roles") ═══ */
+/* ═══ DEFAULT DEPARTMENT & ROLES (fully editable via the Roles tab) ═══ */
+const DEFAULT_JDS = {
+  'DevSecOps Engineer': `Role: DevSecOps Engineer — Infra and DevOps.
+Purpose: Embed security into every stage of the CI/CD lifecycle.
+Responsibilities: Build and maintain secure CI/CD pipelines (GitLab CI/Jenkins/GitHub Actions); integrate SAST/DAST/SCA scanning (SonarQube, Snyk, Trivy); manage secrets (HashiCorp Vault); harden container and Kubernetes workloads (OPA/Gatekeeper, Falco); automate compliance checks (CIS benchmarks); respond to vulnerabilities with dev teams; infrastructure-as-code security reviews (Terraform, Checkov).
+Requirements: 4+ years DevOps or security engineering; strong scripting (Python/Bash); Docker & Kubernetes in production; cloud security on AWS or Azure; experience with vulnerability management and remediation SLAs. Preferred: CKS, AWS Security Specialty, or CISSP; policy-as-code experience.`,
+  'Senior DevOps Engineer': `Role: Senior DevOps Engineer — Infra and DevOps.
+Purpose: Own build, release, and runtime reliability for production platforms.
+Responsibilities: Design and operate Kubernetes clusters (EKS/AKS); IaC with Terraform and Helm; CI/CD architecture and release automation; observability (Prometheus, Grafana, ELK, OpenTelemetry); capacity planning, cost optimisation, and incident response; mentor junior engineers; drive SRE practices (SLOs, error budgets, blameless postmortems).
+Requirements: 6+ years DevOps/SRE; expert in at least one major cloud (AWS/Azure/GCP); strong Linux internals and networking; Python or Go automation; production Kubernetes at scale; on-call leadership experience. Preferred: CKA/CKAD, AWS DevOps Professional; GitOps (ArgoCD/Flux).`,
+  'Senior Network Engineer': `Role: Senior Network Engineer — Infra and DevOps.
+Purpose: Design, implement, and operate enterprise and cloud network infrastructure.
+Responsibilities: Architect LAN/WAN/DC networks; routing & switching (BGP, OSPF, VXLAN/EVPN); firewalls and segmentation (Palo Alto, Fortinet); cloud networking (VPC/VNet design, Transit Gateway, ExpressRoute/Direct Connect); SD-WAN rollout; load balancing (F5/NGINX); network automation (Ansible, Python, Netmiko); performance troubleshooting and capacity planning; participate in on-call.
+Requirements: 7+ years network engineering; deep TCP/IP; hands-on with enterprise routing/switching platforms (Cisco/Juniper/Arista); hybrid-cloud connectivity; automation mindset. Preferred: CCNP/CCIE, PCNSE, AWS Advanced Networking.`,
+  'Senior Cyber Security Engineer': `Role: Senior Cyber Security Engineer — Infra and DevOps.
+Purpose: Protect infrastructure, endpoints, and cloud workloads against evolving threats.
+Responsibilities: Operate and tune SIEM/SOAR (Splunk, Sentinel); threat detection engineering and hunting (MITRE ATT&CK); EDR management (CrowdStrike/Defender); vulnerability management and penetration-test remediation; cloud security posture (CSPM); incident response leadership including forensics; security architecture reviews; awareness and tabletop exercises.
+Requirements: 6+ years security engineering/operations; strong knowledge of network and OS internals; scripting (Python/PowerShell); cloud security on AWS or Azure; incident response experience end-to-end. Preferred: OSCP, GCIH/GCIA, CISSP; regional regulatory exposure (UAE IA / NESA, ISO 27001).`,
+  'Infra Architect': `Role: Infrastructure Architect — Infra and DevOps.
+Purpose: Define target-state infrastructure architecture across on-prem and cloud.
+Responsibilities: Produce reference architectures and roadmaps (compute, storage, network, virtualisation, cloud landing zones); lead cloud migration and hybrid designs (AWS/Azure); HA/DR strategy and BCP; capacity, licensing, and TCO planning; governance and standards; vendor evaluation and RFPs; guide engineering teams on implementation; present to senior stakeholders.
+Requirements: 10+ years infrastructure with 3+ as architect; enterprise virtualisation (VMware), storage, and DC design; cloud landing-zone architecture; IaC awareness (Terraform); strong documentation and stakeholder communication. Preferred: TOGAF, Azure Solutions Architect Expert or AWS SA Professional.`,
+  'Security Architect': `Role: Security Architect — Infra and DevOps.
+Purpose: Own the enterprise security architecture and design secure-by-default systems.
+Responsibilities: Define security reference architecture (zero trust, IAM, network segmentation, data protection); security requirements and threat modelling for new platforms and cloud landing zones; standards aligned to ISO 27001, NIST CSF, UAE IA/NESA; review designs and exceptions; guide DevSecOps and SOC capability building; M&A and third-party security assessments; report risk posture to leadership.
+Requirements: 10+ years security with 3+ as architect; identity architecture (Entra ID/AD, PAM); cloud security architecture (AWS/Azure); cryptography and PKI fundamentals; regulatory compliance experience in the region. Preferred: CISSP-ISSAP, SABSA, CCSP.`,
+};
 function defaultDepartments() {
-  const mk = (name) => ({ id: 'd' + Math.random().toString(36).slice(2, 9), name, roles: [] });
-  const mkRole = (name) => ({ id: 'r' + Math.random().toString(36).slice(2, 9), name, jdText: '', jdName: '', jdSetAt: '', jdSetBy: '' });
-  const devops = mk('DevOps Engineering');
-  devops.roles = [mkRole('DevOps Engineer (Entry-level)'), mkRole('ASR Engineer'), mkRole('Cyber Security Engineer'), mkRole('Senior DevOps Engineer')];
-  const api = mk('API Settings');
-  api.roles = [mkRole('API Integration Engineer'), mkRole('API Support Specialist')];
-  const finance = mk('Finance');
-  finance.roles = [mkRole('Finance Analyst'), mkRole('Accounts Executive')];
-  const churn = mk('High Churn');
-  churn.roles = [mkRole('Customer Support Representative'), mkRole('Sales Executive')];
-  return [devops, api, finance, churn];
+  const mkRole = (name) => ({
+    id: 'r' + Math.random().toString(36).slice(2, 9), name,
+    jdText: DEFAULT_JDS[name] || '', jdName: DEFAULT_JDS[name] ? 'Built-in JD (editable on Roles tab)' : '',
+    jdSetAt: DEFAULT_JDS[name] ? new Date().toISOString() : '', jdSetBy: DEFAULT_JDS[name] ? 'TalentScope defaults' : '',
+  });
+  const dept = { id: 'd' + Math.random().toString(36).slice(2, 9), name: 'Infra and DevOps', roles: [] };
+  dept.roles = ['DevSecOps Engineer', 'Senior DevOps Engineer', 'Senior Network Engineer',
+    'Senior Cyber Security Engineer', 'Infra Architect', 'Security Architect'].map(mkRole);
+  return [dept];
+}
+
+/* One-time migration: if the workspace still holds the old sample departments
+   untouched (no JDs saved, no screening history), swap in the new set. */
+const OLD_DEFAULT_DEPTS = ['DevOps Engineering', 'API Settings', 'Finance', 'High Churn'];
+function migrateDefaultDepartments() {
+  const d = state.departments || [];
+  const looksLikeOldDefaults = d.length > 0 && d.every(x => OLD_DEFAULT_DEPTS.includes(x.name))
+    && d.every(x => x.roles.every(r => !r.jdText));
+  if (looksLikeOldDefaults && (!state.history || state.history.length === 0)) {
+    state.departments = defaultDepartments();
+    state.selectedDeptId = state.departments[0].id;
+    state.selectedRoleId = state.departments[0].roles[0].id;
+  }
 }
 
 function findDept(id) { return state.departments.find(d => d.id === id); }
@@ -4773,11 +4822,20 @@ function renderDeptList() {
           <div class="role-row" data-dept="${d.id}" data-role="${r.id}">
             <span class="role-row__name">${escHtml(r.name)}</span>
             <span class="role-row__jd ${r.jdText ? 'set' : 'unset'}">${r.jdText ? 'JD saved' : 'No JD'}</span>
+            <button class="sched-mini-btn role-jd-upload" data-dept="${d.id}" data-role="${r.id}" title="Upload or replace this role's JD">📄 ${r.jdText ? 'Replace JD' : 'Upload JD'}</button>
             <button class="sched-mini-btn role-del" data-dept="${d.id}" data-role="${r.id}">🗑</button>
           </div>`).join('') || '<div style="opacity:0.6; font-size:12px;">No roles yet.</div>'}
       </div>
     </div>`).join('');
 
+  el.querySelectorAll('.role-jd-upload').forEach(btn => btn.addEventListener('click', () => {
+    if (state.user && state.user.guest) { notify('Guests are view-only — log in as a team member to upload JDs.', false); return; }
+    // Point the JD editor at this role, then open the file picker directly.
+    state.selectedDeptId = btn.dataset.dept;
+    state.selectedRoleId = btn.dataset.role;
+    renderDeptRoleSelects();
+    jdFile.click();
+  }));
   el.querySelectorAll('.dept-del').forEach(btn => btn.addEventListener('click', () => {
     const d = findDept(btn.dataset.dept);
     if (!d) return;
@@ -6820,6 +6878,17 @@ function confirmSlot(idx, slotId) {
     }
   });
   renderSchedTable(); updateSchedCounts();
+
+  /* ── Automation after confirmation ──
+     1) Move the candidacy to the "Interview" stage on the pipeline board.
+     2) Generate the calendar invite (.ics) addressed to BOTH the candidate and the
+        interviewer — it opens in Outlook desktop; HR just presses Send. */
+  const cand = (state.history || []).find(h => h.name === inv.candidateName && h.stage !== 'hired');
+  if (cand && cand.stage !== 'interview') setStage(cand.hid, 'interview');
+  try {
+    downloadICS(idx);
+    notify(`✓ ${inv.candidateName} confirmed ${slot.date} ${slot.start}. Meeting invite generated — open it in Outlook and press Send (candidate + ${slot.interviewer || 'interviewer'} are both attendees). Pipeline card moved to Interview.`, false);
+  } catch (e) { /* ics is best-effort */ }
 }
 
 function releaseSlots(inv) {
@@ -7571,6 +7640,61 @@ document.getElementById('profSearch').addEventListener('input', () => {
 });
 
 /* ═══════════════════════════ RECRUITMENT PIPELINE (openings + kanban) ═══════════════════════════ */
+
+/* One-click interview scheduling from a Shortlisted card:
+   picks 3 one-hour slots from the interviewer-availability pool (spread across
+   dates), records the invitation, opens a pre-composed email in Outlook desktop,
+   and — after HR clicks the slot the candidate confirms — auto-generates the
+   Outlook meeting invite for candidate + interviewer and moves the card to Interview. */
+function scheduleFromPipeline(hid) {
+  if (state.user && state.user.guest) { notify('Guests are view-only — log in as a team member to schedule interviews.', false); return; }
+  const h = findHistoryByHid(hid);
+  if (!h) return;
+  const panel = document.getElementById('panelScheduling');
+  if (!state.sched.slots.length) {
+    if (panel) { panel.style.display = ''; panel.scrollIntoView({ behavior: 'smooth' }); }
+    showView('screening');
+    notify('No interviewer availability loaded yet — upload the availability sheet (exported from Outlook calendar) in § 03 Interview Scheduling first, then click Schedule again.', false);
+    return;
+  }
+  let inv = state.sched.invites.find(i => i.candidateKey === ('hid:' + hid) || i.candidateName === h.name);
+  if (!inv) {
+    const pool = freeSlots();
+    const chosen = [];
+    for (const slot of pool) {
+      if (chosen.length >= 3) break;
+      if (!chosen.some(c => c.date === slot.date) || pool.length <= 3) chosen.push(slot);
+    }
+    for (const slot of pool) { if (chosen.length >= 3) break; if (!chosen.includes(slot)) chosen.push(slot); }
+    if (!chosen.length) { notify('All availability slots are taken — upload more interviewer slots and retry.', false); return; }
+    chosen.forEach(s => s.heldBy.push(h.name));
+    inv = {
+      candidateKey: 'hid:' + hid,
+      candidateName: h.name,
+      candidateEmail: h.email || '',
+      role: `${h.dept} · ${h.roleName || h.role}`,
+      slotIds: chosen.map(s => s.id),
+      status: 'pending',
+      confirmedSlotId: null,
+      invitedAt: null,
+    };
+    state.sched.invites.push(inv);
+    persistSession();
+  }
+  if (panel) panel.style.display = '';
+  showView('screening');
+  renderSchedTable(); updateSchedCounts();
+  const idx = state.sched.invites.indexOf(inv);
+  setTimeout(() => {
+    if (panel) panel.scrollIntoView({ behavior: 'smooth' });
+    if (inv.candidateEmail) {
+      sendInviteEmail(idx);   // opens Outlook desktop with the 3 slots pre-written
+    } else {
+      notify(`${h.name} has 3 slots held, but no email was found in their CV — type it into the Email column below, then click ✉ Email.`, false);
+    }
+  }, 250);
+}
+
 function openingLabel(o) { return `${o.deptName} · ${o.roleName}`; }
 function openingHiredCount(o) { return (state.history || []).filter(h => h.openingId === o.id && h.stage === 'hired').length; }
 function openingPipelineCount(o) { return (state.history || []).filter(h => h.openingId === o.id && h.stage !== 'rejected' && h.stage !== 'hired').length; }
@@ -7721,6 +7845,7 @@ function renderKanban() {
           <div class="kanban-card__name">${escHtml(h.name)}</div>
           <div class="kanban-card__meta">${escHtml(h.dept)} · ${escHtml(h.roleName || h.role)}</div>
           ${opening ? `<span class="opening-pill">📌 ${escHtml(opening.manager || 'Opening')}</span>` : ''}
+          ${(h.stage === 'shortlisted' && !isGuest) ? `<button class="sched-mini-btn kanban-schedule" data-hid="${h.hid}" style="width:100%; margin:6px 0 2px;">📅 Schedule interview via Outlook</button>` : ''}
           <div class="kanban-card__foot">
             <span class="kanban-card__score">${h.score ?? '—'}/100</span>
             ${moveBtns}
@@ -7735,6 +7860,9 @@ function renderKanban() {
       if (!btn.dataset.move) return;
       setStage(btn.dataset.hid, btn.dataset.move);
     });
+  });
+  board.querySelectorAll('.kanban-schedule').forEach(btn => {
+    btn.addEventListener('click', () => scheduleFromPipeline(btn.dataset.hid));
   });
 }
 
@@ -7914,6 +8042,7 @@ function applySnapshot(s) {
     renderPrivacyPanel();
     if (Array.isArray(s.departments) && s.departments.length > 0) {
       state.departments = s.departments;
+      migrateDefaultDepartments();
       if (!findDept(state.selectedDeptId)) state.selectedDeptId = state.departments[0]?.id || '';
       if (!currentRole()) state.selectedRoleId = findDept(state.selectedDeptId)?.roles[0]?.id || '';
       renderDeptRoleSelects();
