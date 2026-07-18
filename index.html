@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1e1f1e">
+<meta name="theme-color" content="#ffffff">
 <title>TalentScope · AI Candidate Screening</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,7 @@
 <script>
 /* Build stamp + fatal-error banner. This runs before the app script, so even a
    crash during page load produces a visible red banner instead of silence. */
-window.__TS_BUILD = '2026-07-18.7';
+window.__TS_BUILD = '2026-07-18.9';
 window.addEventListener('error', function (e) {
   try {
     if (document.getElementById('tsFatalBanner')) return;
@@ -36,40 +36,40 @@ console.info('TalentScope build', window.__TS_BUILD);
 
 <style>
 :root {
-  /* Inception42-inspired dark theme — base background matches their official
-     theme colour (#1e1f1e, a green-tinted charcoal), off-white text, bright
-     green accent. Adjust --accent if the brand green needs fine-tuning. */
-  --paper:       #1e1f1e;
-  --paper-2:     #242625;
-  --paper-3:     #2b2e2c;
-  --card:        #262928;
-  --ink:         #f2f4f0;
-  --ink-2:       #d6dad4;
-  --ink-3:       #9aa49c;
-  --ink-4:       #6d766f;
-  --line:        #343836;
-  --line-2:      #454b48;
+  /* Inception42-inspired light theme — white content on their charcoal text colour
+     (#1e1f1e) with the brand green as accent. Topbar & login hero stay dark charcoal
+     like the site's nav/hero. Tune --accent / --accent-2 to match brand green exactly. */
+  --paper:       #ffffff;
+  --paper-2:     #f6f8f7;
+  --paper-3:     #eef1ef;
+  --card:        #ffffff;
+  --ink:         #1e1f1e;
+  --ink-2:       #3a3d3b;
+  --ink-3:       #6f7672;
+  --ink-4:       #a2a8a4;
+  --line:        #e4e8e5;
+  --line-2:      #cfd5d1;
 
-  --approved:      #4fdd8f;
-  --approved-bg:   #1d3327;
-  --approved-bd:   #2f5c42;
+  --approved:      #0e9c5c;
+  --approved-bg:   #e7f7ee;
+  --approved-bd:   #b9e4cc;
 
-  --rejected:      #ff8577;
-  --rejected-bg:   #3a2523;
-  --rejected-bd:   #6b3a35;
+  --rejected:      #c93a2e;
+  --rejected-bg:   #fbeae8;
+  --rejected-bd:   #ecc4bf;
 
-  --borderline:    #e8b44a;
-  --borderline-bg: #38301e;
-  --borderline-bd: #6b5a33;
+  --borderline:    #b07b12;
+  --borderline-bg: #fbf3df;
+  --borderline-bd: #e8d49c;
 
-  --accent:        #4fdd8f;
-  --accent-2:      #7ce8ad;
-  --accent-bg:     #22352b;
+  --accent:        #0e9c5c;
+  --accent-2:      #12b56d;
+  --accent-bg:     #e7f7ee;
 
-  --gold:          #cfae5e;
+  --gold:          #907838;
 
-  --warn:          #f0824e;
-  --warn-bg:       #3c2a20;
+  --warn:          #c25a1f;
+  --warn-bg:       #fbeadf;
 
   --font-display: 'Fraunces', Georgia, serif;
   --font-ui:      'Outfit', system-ui, -apple-system, sans-serif;
@@ -79,10 +79,10 @@ console.info('TalentScope build', window.__TS_BUILD);
   --r:    10px;
   --r-lg: 14px;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow:    0 4px 14px rgba(0,0,0,0.35);
-  --shadow-lg: 0 20px 50px -12px rgba(0,0,0,0.55);
-  --shadow-xl: 0 40px 80px -20px rgba(0,0,0,0.65);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow:    0 4px 14px rgba(0,0,0,0.07);
+  --shadow-lg: 0 20px 50px -12px rgba(0,0,0,0.16);
+  --shadow-xl: 0 40px 80px -20px rgba(0,0,0,0.22);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -107,7 +107,7 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.95 0 0 0 0 0.98 0 0 0 0 0.95 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.12 0 0 0 0 0.12 0 0 0 0 0.12 0 0 0 0.03 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   opacity: 0.5;
   mix-blend-mode: multiply;
 }
@@ -132,8 +132,8 @@ body::before {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 85% 15%, rgba(79,221,143,0.05) 0%, transparent 50%),
-    radial-gradient(ellipse 70% 80% at 10% 90%, rgba(79,221,143,0.04) 0%, transparent 55%);
+    radial-gradient(ellipse 80% 60% at 85% 15%, rgba(14,156,92,0.05) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 80% at 10% 90%, rgba(14,156,92,0.04) 0%, transparent 55%);
   pointer-events: none;
 }
 
@@ -156,7 +156,7 @@ body::before {
   background:
     radial-gradient(ellipse 100% 80% at 20% 0%, rgba(79,221,143,0.10) 0%, transparent 60%),
     linear-gradient(165deg, #161716 0%, #232624 100%);
-  color: var(--ink);
+  color: #f2f4f0;
   padding: 50px 52px;
   display: flex;
   flex-direction: column;
@@ -463,8 +463,7 @@ body::before {
 /* Top bar */
 .topbar {
   background: #161716;
-  color: var(--ink);
-  border-bottom: 1px solid var(--line);
+  color: #f2f4f0;
   position: relative;
   z-index: 10;
   border-bottom: 1px solid rgba(79,221,143,0.15);
@@ -565,17 +564,17 @@ body::before {
 }
 .slot-chip {
   display: inline-block; padding: 3px 9px; margin: 2px 3px 2px 0; border-radius: 20px;
-  border: 1px solid var(--line-2); font-size: 11.5px; background: rgba(255,255,255,0.04); cursor: pointer;
+  border: 1px solid var(--line-2); font-size: 11.5px; background: rgba(0,0,0,0.02); cursor: pointer;
   transition: all 0.12s;
 }
 .slot-chip:hover { border-color: var(--approved); }
 .slot-chip.confirmed { background: var(--approved); color: #fff; border-color: var(--approved); font-weight: 600; }
 .slot-chip.released { opacity: 0.35; text-decoration: line-through; cursor: default; }
 .sched-status-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; display: inline-block; }
-.sched-status-pill.pending   { background: rgba(255,255,255,0.10); }
-.sched-status-pill.invited   { background: rgba(79,221,143,0.15); color: var(--accent-2); }
-.sched-status-pill.confirmed { background: var(--approved); color: #10231a; }
-.sched-status-pill.declined  { background: var(--rejected); color: #33110d; }
+.sched-status-pill.pending   { background: rgba(0,0,0,0.06); }
+.sched-status-pill.invited   { background: var(--accent-bg); color: var(--accent); }
+.sched-status-pill.confirmed { background: var(--approved); color: #fff; }
+.sched-status-pill.declined  { background: var(--rejected); color: #fff; }
 .sched-mini-btn {
   font-size: 11.5px; padding: 5px 9px; border: 1px solid var(--line-2); border-radius: var(--r-sm);
   background: var(--card); cursor: pointer; margin: 2px 3px 2px 0; white-space: nowrap;
@@ -604,7 +603,7 @@ body::before {
 .dept-card__name { font-weight: 700; font-size: 13.5px; }
 .dept-card__roles { display: flex; flex-direction: column; gap: 4px; }
 .role-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 5px 6px; border-radius: 6px; }
-.role-row:hover { background: rgba(255,255,255,0.04); }
+.role-row:hover { background: rgba(0,0,0,0.03); }
 .role-row__name { flex: 1; }
 .role-row__jd { font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 700; }
 .role-row__jd.set { background: var(--approved-bg); color: var(--approved); }
@@ -1006,7 +1005,7 @@ textarea::placeholder {
   transition: all 0.15s;
   cursor: pointer;
 }
-.jd-preview__clear:hover { background: rgba(255,255,255,0.08); color: var(--rejected); }
+.jd-preview__clear:hover { background: rgba(0,0,0,0.06); color: var(--rejected); }
 
 .candidate-list {
   flex: 1;
@@ -1264,7 +1263,7 @@ textarea::placeholder {
 }
 .btn-primary {
   background: var(--accent);
-  color: #10231a;
+  color: #ffffff;
   border: none;
   padding: 14px 30px;
   border-radius: var(--r);
@@ -1279,7 +1278,7 @@ textarea::placeholder {
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-2);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px -4px rgba(79,221,143,0.4);
+  box-shadow: 0 8px 20px -4px rgba(14,156,92,0.35);
 }
 .btn-primary:disabled {
   background: rgba(255,255,255,0.2);
@@ -1810,7 +1809,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
 }
 .security-card.warn {
   background: var(--warn-bg);
-  border: 1px solid #6b4a33;
+  border: 1px solid #f0c5a8;
   color: var(--warn);
 }
 .security-card b { font-weight: 700; }
@@ -1852,7 +1851,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
 .modal__bd {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(30,31,30,0.5);
   backdrop-filter: blur(4px);
 }
 .modal__card {
@@ -2171,7 +2170,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
 .ai-fab__icon {
   width: 30px; height: 30px;
   background: var(--accent);
-  color: #10231a;
+  color: #ffffff;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -2249,7 +2248,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
 .ai-panel__mark {
   width: 36px; height: 36px;
   background: var(--accent);
-  color: #10231a;
+  color: #ffffff;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -2993,7 +2992,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
   align-items: center;
   gap: 10px;
   background: var(--accent);
-  color: #10231a;
+  color: #ffffff;
   padding: 14px 28px;
   border-radius: 10px;
   font-weight: 700;
@@ -3648,6 +3647,9 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         </div>
       </div>
       <p class="panel__desc">Add a new department or role, rename one by deleting and re-adding it, or remove one you no longer need.</p>
+      <div class="dept-admin__row">
+        <button class="btn-export" id="resetDeptsBtn" title="Replace ALL departments and roles with the current defaults (Infra and DevOps + 6 roles with built-in JDs)">↺ Reset to default departments &amp; roles</button>
+      </div>
       <div class="dept-admin__row">
         <input type="text" id="newDeptName" placeholder="New department name (e.g. Marketing)">
         <button class="sched-mini-btn" id="addDeptBtn">+ Add department</button>
@@ -4858,6 +4860,18 @@ function renderDeptList() {
     persistSession();
   }));
 }
+
+document.getElementById('resetDeptsBtn').addEventListener('click', () => {
+  if (state.user && state.user.guest) { notify('Guests are view-only.', false); return; }
+  if (!confirm('Replace ALL departments and roles with the defaults (Infra and DevOps → DevSecOps Engineer, Senior DevOps Engineer, Senior Network Engineer, Senior Cyber Security Engineer, Infra Architect, Security Architect — each with a built-in JD)?\n\nExisting departments, roles, and their saved JDs are removed for the whole team. Screening history, reports, and the pipeline are kept.')) return;
+  state.departments = defaultDepartments();
+  state.selectedDeptId = state.departments[0].id;
+  state.selectedRoleId = state.departments[0].roles[0].id;
+  renderDeptRoleSelects();
+  renderReportDeptSelect(); renderMatchDeptSelect(); renderProfDeptSelect(); renderRolesDashboard();
+  persistSession();
+  notify('✓ Departments reset — Infra and DevOps with 6 roles, all JDs pre-loaded.', false);
+});
 
 document.getElementById('addDeptBtn').addEventListener('click', () => {
   const input = document.getElementById('newDeptName');
@@ -7145,7 +7159,7 @@ function historyStatus(h) { return h.status || mapFinalToStatus(h.final); }
 const STATUS_LABEL = { approved: 'Approved ✓', rejected: 'Rejected ✕', hold: 'On Hold ⏸' };
 const STATUS_COLOR = { approved: 'var(--approved)', rejected: 'var(--rejected)', hold: 'var(--borderline)' };
 function statusPill(status) {
-  return `<span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; color:#10231a; background:${STATUS_COLOR[status] || '#888'};">${STATUS_LABEL[status] || status}</span>`;
+  return `<span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; color:#fff; background:${STATUS_COLOR[status] || '#888'};">${STATUS_LABEL[status] || status}</span>`;
 }
 function statusSelectHTML(hid, status) {
   return `<select class="emp-id-input status-select" data-hid="${hid}" style="width:120px;">
@@ -7451,7 +7465,7 @@ document.getElementById('matchRunBtn').addEventListener('click', async () => {
 const VERDICT_LABEL = { approved: 'Approved ✓', rejected: 'Rejected ✕', borderline: 'Borderline ⚠', error: 'Error' };
 const VERDICT_COLOR = { approved: 'var(--approved)', rejected: 'var(--rejected)', borderline: 'var(--borderline)', error: 'var(--ink-3, #888)' };
 function verdictPill(final) {
-  return `<span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; color:#10231a; background:${VERDICT_COLOR[final] || '#888'};">${VERDICT_LABEL[final] || final}</span>`;
+  return `<span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:11.5px; font-weight:700; color:#fff; background:${VERDICT_COLOR[final] || '#888'};">${VERDICT_LABEL[final] || final}</span>`;
 }
 
 function dashHistory() {
@@ -7597,7 +7611,7 @@ function renderProfiles() {
       <td><button class="sched-mini-btn comment-toggle" data-hid="${h.hid}">💬 ${n}</button></td>
     </tr>
     <tr class="comments-row" data-hid-row="${h.hid}" style="display:none;">
-      <td colspan="10" style="background:rgba(255,255,255,0.03);">
+      <td colspan="10" style="background:rgba(0,0,0,0.02);">
         <div class="comments-list" data-hid="${h.hid}" style="font-size:12px; margin-bottom:8px;">
           ${(h.comments || []).map(c => `<div style="margin-bottom:4px;"><b>${escHtml(c.by)}</b> · <span style="opacity:0.6;">${new Date(c.at).toLocaleString()}</span><br>${escHtml(c.text)}</div>`).join('') || '<div style="opacity:0.6;">No comments yet.</div>'}
         </div>
