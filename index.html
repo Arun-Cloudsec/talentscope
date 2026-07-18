@@ -14,7 +14,7 @@
 <script>
 /* Build stamp + fatal-error banner. This runs before the app script, so even a
    crash during page load produces a visible red banner instead of silence. */
-window.__TS_BUILD = '2026-07-18.2';
+window.__TS_BUILD = '2026-07-18.4';
 window.addEventListener('error', function (e) {
   try {
     if (document.getElementById('tsFatalBanner')) return;
@@ -618,6 +618,26 @@ body::before {
 #uploaderModal .modal__card { max-width: 420px; }
 .disabled-zone { opacity: 0.45; pointer-events: none; filter: grayscale(0.3); }
 .guest-only-note { display: none; font-size: 12px; color: var(--borderline); margin-top: 8px; }
+
+/* ═══ PIPELINE KANBAN ═══ */
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(210px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.kanban-col { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px; min-height: 160px; }
+.kanban-col__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.kanban-col__title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+.kanban-col__count { font-size: 11px; font-weight: 700; background: var(--card); border: 1px solid var(--line-2); border-radius: 12px; padding: 2px 8px; }
+.kanban-col.hired .kanban-col__title { color: var(--approved); }
+.kanban-col.rejectedcol .kanban-col__title { color: var(--rejected); }
+.kanban-card { background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 9px 10px; margin-bottom: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.kanban-card__name { font-weight: 700; font-size: 13px; }
+.kanban-card__meta { font-size: 11px; color: var(--ink-3); margin: 2px 0 6px; }
+.kanban-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.kanban-card__score { font-size: 11px; font-weight: 700; }
+.kanban-move { display: flex; gap: 4px; }
+.kanban-move button { border: 1px solid var(--line-2); background: var(--paper); border-radius: 6px; width: 26px; height: 24px; cursor: pointer; font-size: 13px; line-height: 1; }
+.kanban-move button:hover { background: var(--ink); color: var(--paper); }
+.kanban-move button:disabled { opacity: 0.3; cursor: default; }
+.kanban-card__stagehist { font-size: 10.5px; color: var(--ink-4); margin-top: 5px; }
+.opening-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 700; background: var(--paper-3); border: 1px solid var(--line-2); margin-top: 4px; }
 
 .top-actions {
   display: flex;
@@ -3066,6 +3086,13 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <span>📖</span>
         <span>Read the <em>How It Works</em> guide</span>
       </a>
+
+      <p style="margin-top:14px; font-size:11px; color:var(--ink-3); line-height:1.5;">
+        Candidate data entered here is processed for recruitment purposes only, stored in your organisation's
+        workspace database, and shared with AI providers (Anthropic / OpenAI / Google) solely to evaluate
+        CVs against job descriptions. See the Data &amp; Privacy panel (Candidates tab) for retention and
+        data-subject request tools.
+      </p>
     </section>
   </div>
 </div>
@@ -3097,6 +3124,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
       <nav class="main-nav">
         <a class="active" data-view="screening">Screening</a>
         <a data-view="roles">Roles</a>
+        <a data-view="pipeline">Pipeline</a>
         <a data-view="dashboard">Candidates</a>
         <a data-scroll="panelReports">Reports</a>
         <a data-scroll="panelDeptMatch">Find Matches</a>
@@ -3513,7 +3541,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <table>
           <thead><tr>
             <th>Candidate</th><th>Email</th><th>Phone</th><th>Department</th><th>Role</th>
-            <th>Status</th><th>Score</th><th>Screened</th><th>Comments</th>
+            <th>Status</th><th>Stage</th><th>Score</th><th>Screened</th><th>Comments</th>
           </tr></thead>
           <tbody id="profileBody"></tbody>
         </table>
@@ -3558,6 +3586,37 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         </div>
       </div>
       <div id="dashCandStatus" style="margin-top:6px;"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ 🛡</span>
+          <span class="panel__name">Data &amp; <em>Privacy</em></span>
+        </div>
+        <span class="panel__count" id="privacyStatus">—</span>
+      </div>
+      <p class="panel__desc">
+        Controls supporting GDPR / UAE PDPL obligations: storage limitation (auto-retention), data minimisation (CV text storage), and data-subject requests (per-candidate export and deletion via Candidate Lookup above). These settings apply to the whole shared workspace.
+      </p>
+      <div class="report-toolbar">
+        <div class="sched-field" style="min-width:220px;">
+          <label>Auto-delete records older than</label>
+          <select id="retentionSelect">
+            <option value="0">Keep indefinitely (not recommended)</option>
+            <option value="6">6 months</option>
+            <option value="12">12 months</option>
+            <option value="24">24 months</option>
+          </select>
+        </div>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; padding-bottom:9px;">
+          <input type="checkbox" id="storeCvToggle" checked> Store CV text for database matching
+        </label>
+        <button class="btn-export" id="purgeNowBtn">🗑 Apply retention now</button>
+      </div>
+      <p style="font-size:12px; color:var(--ink-3); margin-top:4px;">
+        Unchecking CV storage stops keeping résumé text for future records (existing text is removed on the next retention run) — the "Find Matches in Existing Database" feature won't work for those candidates. Candidate deletions and expired records are removed for the whole team and cannot be recovered.
+      </p>
     </section>
 
   </div>
@@ -3653,6 +3712,70 @@ tbody td { padding: 14px 16px; vertical-align: top; }
           <tbody id="rolesDashBody"></tbody>
         </table>
       </div></div>
+    </section>
+
+  </div>
+
+  <!-- ═══ RECRUITMENT PIPELINE (end-to-end tracking) ═══ -->
+  <div class="page" id="viewPipeline" style="display:none;">
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ ⧉</span>
+          <span class="panel__name">Recruitment <em>Overview</em></span>
+        </div>
+        <span class="panel__count" id="pipeMetricsSince">—</span>
+      </div>
+      <p class="panel__desc">The full funnel across every opening — from first screen to signed hire.</p>
+      <div class="summary-grid" id="pipeMetrics"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ O</span>
+          <span class="panel__name">Job <em>Openings</em></span>
+        </div>
+        <span class="panel__count" id="openingsCount">0 open</span>
+      </div>
+      <p class="panel__desc">Create an opening per role you're hiring for — headcount, hiring manager, and target date. Hires are counted against headcount automatically; close the opening when it's filled.</p>
+      <div class="report-toolbar" id="openingForm">
+        <div class="sched-field"><label>Department</label><select id="openDeptSelect"></select></div>
+        <div class="sched-field"><label>Role</label><select id="openRoleSelect"></select></div>
+        <div class="sched-field" style="min-width:110px; flex:0.5;"><label>Headcount</label><input type="number" id="openHeadcount" min="1" value="1"></div>
+        <div class="sched-field"><label>Hiring manager</label><input type="text" id="openManager" placeholder="e.g. Omar Farouk"></div>
+        <div class="sched-field" style="min-width:150px; flex:0.7;"><label>Target date</label><input type="date" id="openTarget"></div>
+        <button class="btn-export" id="addOpeningBtn">+ Create opening</button>
+      </div>
+      <div class="guest-only-note">Guests can view the pipeline but can't create openings or move candidates.</div>
+      <div class="results-table"><div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Opening</th><th>Hiring Manager</th><th>Headcount</th><th>Hired</th><th>In Pipeline</th><th>Target</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="openingsBody"></tbody>
+        </table>
+      </div></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ K</span>
+          <span class="panel__name">Pipeline <em>Board</em></span>
+        </div>
+        <span class="panel__count" id="pipeBoardCount">0 candidates</span>
+      </div>
+      <p class="panel__desc">Every candidacy (candidate × role) moves left to right: Screened → Shortlisted → Interview → Offer → Hired. Use ‹ › on a card to move it; every move is stamped with who and when.</p>
+      <div class="report-toolbar">
+        <div class="sched-field"><label>Department</label><select id="pipeDeptFilter"><option value="">All departments</option></select></div>
+        <div class="sched-field"><label>Opening</label><select id="pipeOpeningFilter"><option value="">All openings</option></select></div>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; padding-bottom:9px;">
+          <input type="checkbox" id="pipeShowRejected"> Show rejected
+        </label>
+      </div>
+      <div class="kanban" id="kanbanBoard"></div>
     </section>
 
   </div>
@@ -4165,6 +4288,11 @@ function showView(viewName) {
     roles.style.display = viewName === 'roles' ? '' : 'none';
     if (viewName === 'roles' && typeof renderRolesDashboard === 'function') { renderDeptRoleSelects(); renderRolesDashboard(); }
   }
+  const pipe = document.getElementById('viewPipeline');
+  if (pipe) {
+    pipe.style.display = viewName === 'pipeline' ? '' : 'none';
+    if (viewName === 'pipeline' && typeof renderPipeline === 'function') renderPipeline();
+  }
   document.querySelectorAll('.main-nav a[data-view]').forEach(a => {
     a.classList.toggle('active', a.dataset.view === viewName);
   });
@@ -4242,6 +4370,11 @@ const state = {
   selectedRoleId: '',
   // Name of the person currently uploading CVs (captured once per session via a popup).
   currentUploader: '',
+  // Job openings / requisitions (synced): { id, deptName, roleName, headcount, manager, target, status, openedAt, closedAt }
+  openings: [],
+  // GDPR / UAE PDPL controls (synced, apply to the whole shared workspace):
+  // retentionMonths 0 = keep indefinitely; storeCvText controls data minimisation.
+  privacy: { retentionMonths: 0, storeCvText: true },
 };
 
 /* ═══ DEFAULT DEPARTMENTS & ROLES (fully editable via "Manage departments & roles") ═══ */
@@ -5800,7 +5933,7 @@ function exportExcel(auto) {
     'Uploaded By': r.uploadedBy || '',
     'Security Flags': r.warnings && r.warnings.length > 0 ? r.warnings.map(w => w.type).join(', ') : 'None',
     'Source File': r.filename,
-  }));
+  })).map(xlsSafeRow);
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [
     { wch: 4 }, { wch: 22 }, { wch: 28 }, { wch: 16 }, { wch: 12 }, { wch: 14 },
@@ -6127,7 +6260,7 @@ aiSend.addEventListener('click', sendAIMessage);
 function renderAIMessage(role, text, isTyping) {
   const msg = document.createElement('div');
   msg.className = 'ai-msg ' + role;
-  const avatar = role === 'user' ? (state.user?.initials || 'U') : '✦';
+  const avatar = escHtml(role === 'user' ? (state.user?.initials || 'U') : '✦');
   const roleLabel = role === 'user' ? 'You' : 'TalentScope AI';
   msg.innerHTML = `
     <div class="ai-msg__avatar">${avatar}</div>
@@ -6360,6 +6493,20 @@ function escHtml(s) {
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 }
+
+/* Spreadsheet formula-injection guard: CV-derived text (names, reasons, skills) ends up
+   in Excel/CSV exports. A value starting with = + - @ or a tab/CR is treated as a formula
+   by Excel, so a malicious résumé could execute code or exfiltrate data on the recruiter's
+   machine when the report is opened. Prefix an apostrophe so Excel renders plain text. */
+function xlsSafe(v) {
+  if (v == null || typeof v !== 'string') return v;
+  return /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+}
+function xlsSafeRow(obj) {
+  const out = {};
+  for (const k of Object.keys(obj)) out[k] = xlsSafe(obj[k]);
+  return out;
+}
 function formatBytes(n) {
   if (n < 1024) return n + ' B';
   if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
@@ -6461,7 +6608,7 @@ function parseAvailability(file) {
       const interviewers = [...new Set(slots.map(s => s.interviewer))];
       const summary = document.getElementById('availSummary');
       summary.style.display = '';
-      summary.innerHTML = `✓ <b>${file.name}</b> — ${slots.length} slots across ${interviewers.length} interviewer${interviewers.length > 1 ? 's' : ''} (${interviewers.join(', ')}).`;
+      summary.innerHTML = `✓ <b>${escHtml(file.name)}</b> — ${slots.length} slots across ${interviewers.length} interviewer${interviewers.length > 1 ? 's' : ''} (${interviewers.map(escHtml).join(', ')}).`;
       updateSchedCounts();
     } catch (err) {
       notify('Could not read the availability sheet: ' + err.message, false);
@@ -6575,7 +6722,7 @@ function renderSchedTable() {
 
     // Candidate + email cells
     const emailCell = inv.candidateEmail
-      ? `<span style="font-size:12px;">${inv.candidateEmail}</span>`
+      ? `<span style="font-size:12px;">${escHtml(inv.candidateEmail)}</span>`
       : `<span class="sched-email-warn">not found in resume</span><br><input class="sched-email-input" data-idx="${idx}" placeholder="type email…">`;
 
     // Slot chips — clickable to record the candidate's confirmed choice
@@ -6585,7 +6732,7 @@ function renderSchedTable() {
       if (inv.confirmedSlotId === s.id) cls += ' confirmed';
       else if (inv.confirmedSlotId) cls += ' released';
       else if (s.takenBy && s.takenBy !== inv.candidateName) { cls += ' released'; tip = 'Already confirmed by ' + s.takenBy + ' — use 🔄 Re-offer'; }
-      return `<span class="${cls}" data-idx="${idx}" data-slot="${s.id}" title="${tip}">${i + 1}. ${s.date} ${s.start}${s.end ? '–' + s.end : ''}</span>`;
+      return `<span class="${cls}" data-idx="${idx}" data-slot="${escHtml(s.id)}" title="${escHtml(tip)}">${i + 1}. ${escHtml(s.date)} ${escHtml(s.start)}${s.end ? '–' + escHtml(s.end) : ''}</span>`;
     }).join('');
 
     const pill = {
@@ -6600,9 +6747,9 @@ function renderSchedTable() {
     const canIcs = inv.status === 'confirmed' && inv.confirmedSlotId;
 
     tr.innerHTML = `
-      <td><b>${inv.candidateName}</b><br><span style="font-size:11px; opacity:0.6;">${inv.role}</span></td>
+      <td><b>${escHtml(inv.candidateName)}</b><br><span style="font-size:11px; opacity:0.6;">${escHtml(inv.role)}</span></td>
       <td>${emailCell}</td>
-      <td style="font-size:12px;">${[...new Set(slots.map(s => s.interviewer))].join('<br>')}</td>
+      <td style="font-size:12px;">${[...new Set(slots.map(s => escHtml(s.interviewer)))].join('<br>')}</td>
       <td>${chips}</td>
       <td>${pill}<br>
         <select class="sched-mini-btn" data-respidx="${idx}" style="margin-top:5px;">
@@ -6813,7 +6960,7 @@ document.getElementById('schedMergeBtn').addEventListener('click', () => {
       'Duration': duration + ' minutes',
       'Location': location,
     };
-  });
+  }).map(xlsSafeRow);
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [{ wch: 30 }, { wch: 14 }, { wch: 22 }, { wch: 26 }, { wch: 40 }, { wch: 40 }, { wch: 40 }, { wch: 12 }, { wch: 30 }];
   XLSX.utils.book_append_sheet(wb, ws, 'MailMerge');
@@ -6883,7 +7030,7 @@ document.getElementById('schedExportBtn').addEventListener('click', () => {
       'Confirmed Interviewer': conf ? conf.interviewer : '',
       'Invited At': inv.invitedAt ? new Date(inv.invitedAt).toLocaleString() : '',
     };
-  });
+  }).map(xlsSafeRow);
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 28 }, { wch: 24 }, { wch: 22 }, { wch: 34 }, { wch: 34 }, { wch: 34 }, { wch: 22 }, { wch: 34 }, { wch: 20 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Interview Scheduling');
@@ -6933,21 +7080,49 @@ function statusSelectHTML(hid, status) {
 }
 let _histIdSeq = 1;
 function newHid() { return 'h' + Date.now().toString(36) + (_histIdSeq++) + Math.random().toString(36).slice(2, 5); }
+/* ── Pipeline stages: each history record is one candidacy (candidate × role).
+   Stage order is the recruiting funnel; "rejected" sits outside the flow. ── */
+const STAGES = ['screened', 'shortlisted', 'interview', 'offer', 'hired'];
+const STAGE_LABEL = { screened: 'Screened', shortlisted: 'Shortlisted', interview: 'Interview', offer: 'Offer', hired: 'Hired', rejected: 'Rejected' };
+function stageFromStatus(status) {
+  return status === 'approved' ? 'shortlisted' : status === 'rejected' ? 'rejected' : 'screened';
+}
 function migrateHistory() {
   (state.history || []).forEach(h => {
     if (!h.hid) h.hid = newHid();
     if (!h.status) h.status = mapFinalToStatus(h.final);
     if (h.phone === undefined) h.phone = '';
     if (!Array.isArray(h.comments)) h.comments = [];
+    if (!h.stage) h.stage = stageFromStatus(h.status);
+    if (!Array.isArray(h.stageHistory)) h.stageHistory = [{ stage: h.stage, by: h.uploadedBy || 'system', at: h.ts }];
+    if (h.openingId === undefined) h.openingId = '';
   });
+  if (!Array.isArray(state.openings)) state.openings = [];
 }
 function findHistoryByHid(hid) { return (state.history || []).find(h => h.hid === hid); }
+function setStage(hid, stage) {
+  const h = findHistoryByHid(hid);
+  if (!h || h.stage === stage) return;
+  h.stage = stage;
+  h.stageHistory = h.stageHistory || [];
+  h.stageHistory.push({ stage, by: (state.user && state.user.fullName) || 'HR user', at: new Date().toISOString() });
+  // Keep the simple status in step with the funnel so the Candidates/Reports views agree:
+  // anything at Shortlisted or beyond counts as Approved; Rejected is Rejected; Screened is On Hold.
+  h.status = stage === 'rejected' ? 'rejected' : stage === 'screened' ? 'hold' : 'approved';
+  persistSession();
+  renderPipeline(); renderReport(); renderProfiles(); renderRolesDashboard();
+}
 function updateHistoryStatus(hid, status) {
   const h = findHistoryByHid(hid);
   if (!h) return;
   h.status = status;
+  // Move the pipeline stage only when the status change contradicts it — e.g. an HR
+  // rejection pulls the card out of the funnel, an approval promotes a Screened card.
+  if (status === 'rejected') h.stage = 'rejected';
+  else if (status === 'approved' && (h.stage === 'screened' || h.stage === 'rejected')) h.stage = 'shortlisted';
+  else if (status === 'hold' && h.stage === 'rejected') h.stage = 'screened';
   persistSession();
-  renderReport(); renderProfiles(); renderRolesDashboard();
+  renderReport(); renderProfiles(); renderRolesDashboard(); renderPipeline();
 }
 function addHistoryComment(hid, text) {
   const h = findHistoryByHid(hid);
@@ -6965,6 +7140,10 @@ function recordHistory() {
   const role = state.jdName || (roleObj ? roleObj.name : 'Unspecified role');
   state.results.forEach(r => {
     const cand = state.candidates.find(c => c.id === r.id);
+    const status = mapFinalToStatus(r.final);
+    const stage = stageFromStatus(status);
+    // Auto-link this candidacy to an open opening for the same department + role, if one exists.
+    const opening = (state.openings || []).find(o => o.status === 'open' && o.deptName === (dept ? dept.name : '') && o.roleName === (roleObj ? roleObj.name : ''));
     state.history.push({
       hid: newHid(),
       ts: runTs,
@@ -6978,18 +7157,23 @@ function recordHistory() {
       uploadedBy: r.uploadedBy || '',
       score: r.score,
       final: r.final,
-      status: mapFinalToStatus(r.final),
+      status,
+      stage,
+      stageHistory: [{ stage, by: r.uploadedBy || 'system', at: runTs }],
+      openingId: opening ? opening.id : '',
       comments: [],
       reason: r.reason || '',
       altMatches: r.altMatches || [],
       // Keep the résumé text (capped) so future openings can be matched against the
-      // existing database without asking anyone to re-upload the CV.
-      cvText: cand ? (cand.text || '').slice(0, 8000) : '',
+      // existing database without asking anyone to re-upload the CV — unless the
+      // data-minimisation setting (Data & Privacy panel) has switched this off.
+      cvText: (state.privacy && state.privacy.storeCvText === false) ? '' : (cand ? (cand.text || '').slice(0, 8000) : ''),
     });
   });
   renderReport();
   renderProfiles();
   renderRolesDashboard();
+  renderPipeline();
   updateMatchCount();
 }
 
@@ -7065,12 +7249,14 @@ function reportRowsForExport(deptFilter) {
       'Department': h.dept || '',
       'Role': h.roleName || h.role || '',
       'Status': STATUS_LABEL[historyStatus(h)] || historyStatus(h),
+      'Pipeline Stage': STAGE_LABEL[h.stage] || h.stage || '',
       'Reason': h.reason || '',
       'Comments': (h.comments || []).map(c => `${c.by}: ${c.text}`).join(' | '),
       'Screening Completed': new Date(h.ts).toLocaleString(),
       'Uploaded By': h.uploadedBy || '',
       'Better Fit Elsewhere': (h.altMatches || []).filter(a => a.verdict === 'approved').map(a => `${a.dept} · ${a.role} (${a.score}/100)`).join('; '),
-    }));
+    }))
+    .map(xlsSafeRow);
 }
 
 document.getElementById('reportExportCsv').addEventListener('click', () => {
@@ -7226,7 +7412,7 @@ function renderDashboard() {
   roleBody.innerHTML = Object.entries(roles)
     .sort((a, b) => b[1].total - a[1].total)
     .map(([role, R]) => `<tr>
-      <td><b>${role}</b></td>
+      <td><b>${escHtml(role)}</b></td>
       <td>${R.total}</td>
       <td style="color:var(--approved); font-weight:700;">${R.approved}</td>
       <td style="color:var(--rejected); font-weight:700;">${R.rejected}</td>
@@ -7238,7 +7424,7 @@ function renderDashboard() {
   const roleSel = document.getElementById('dashRoleSelect');
   const prevRole = roleSel.value;
   roleSel.innerHTML = '<option value="">All roles</option>' +
-    Object.keys(roles).sort().map(r => `<option value="${r.replace(/"/g, '&quot;')}">${r}</option>`).join('');
+    Object.keys(roles).sort().map(r => `<option value="${escHtml(r)}">${escHtml(r)}</option>`).join('');
   if ([...roleSel.options].some(o => o.value === prevRole)) roleSel.value = prevRole;
   populateCandDropdown();
   renderProfiles();
@@ -7252,7 +7438,7 @@ function populateCandDropdown() {
     .filter(h => !role || h.role === role)
     .map(h => h.name))].sort();
   candSel.innerHTML = '<option value="">— select candidate —</option>' +
-    names.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+    names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
   if ([...candSel.options].some(o => o.value === prev)) candSel.value = prev;
   renderCandStatus();
 }
@@ -7274,16 +7460,19 @@ function renderCandStatus() {
     <div class="results-table"><div class="table-scroll"><table>
       <thead><tr><th>Role</th><th>Screened On</th><th>Score</th><th>Status</th><th>Assessment</th></tr></thead>
       <tbody>${records.map(h => `<tr>
-        <td>${h.role}</td>
+        <td>${escHtml(h.role)}</td>
         <td style="font-size:12px;">${new Date(h.ts).toLocaleString()}</td>
         <td><b>${h.score ?? '—'}</b></td>
         <td>${statusPill(historyStatus(h))}</td>
-        <td style="font-size:12px; max-width:320px;">${h.reason}</td>
+        <td style="font-size:12px; max-width:320px;">${escHtml(h.reason)}</td>
       </tr>`).join('')}</tbody>
     </table></div></div>${schedLine}
-    <div style="margin-top:10px;">
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button class="sched-mini-btn" id="dashExportProfile">⬇ Export this candidate's data (DSAR)</button>
       <button class="btn-clear" id="dashDeleteProfile">🗑 Delete this profile (all records)</button>
     </div>`;
+  const expBtn = document.getElementById('dashExportProfile');
+  if (expBtn) expBtn.addEventListener('click', () => exportCandidateData(name));
   const delBtn = document.getElementById('dashDeleteProfile');
   if (delBtn) delBtn.addEventListener('click', () => deleteProfile(name));
 }
@@ -7316,7 +7505,7 @@ function renderProfiles() {
     .sort((a, b) => new Date(b.ts) - new Date(a.ts));
   document.getElementById('profileCount').textContent = `${rows.length} profile${rows.length !== 1 ? 's' : ''}`;
   if (rows.length === 0) {
-    body.innerHTML = '<tr><td colspan="9" style="opacity:0.6;">No matching profiles yet.</td></tr>';
+    body.innerHTML = '<tr><td colspan="10" style="opacity:0.6;">No matching profiles yet.</td></tr>';
     return;
   }
   body.innerHTML = rows.map(h => {
@@ -7328,12 +7517,13 @@ function renderProfiles() {
       <td>${escHtml(h.dept || '—')}</td>
       <td style="font-size:12px;">${escHtml(h.roleName || h.role || '—')}</td>
       <td>${statusSelectHTML(h.hid, historyStatus(h))}</td>
+      <td><span class="sched-status-pill ${h.stage === 'hired' ? 'confirmed' : h.stage === 'rejected' ? 'declined' : 'invited'}">${STAGE_LABEL[h.stage] || h.stage || '—'}</span></td>
       <td><b>${h.score ?? '—'}</b></td>
       <td style="font-size:12px; white-space:nowrap;">${new Date(h.ts).toLocaleDateString()}</td>
       <td><button class="sched-mini-btn comment-toggle" data-hid="${h.hid}">💬 ${n}</button></td>
     </tr>
     <tr class="comments-row" data-hid-row="${h.hid}" style="display:none;">
-      <td colspan="9" style="background:rgba(0,0,0,0.02);">
+      <td colspan="10" style="background:rgba(0,0,0,0.02);">
         <div class="comments-list" data-hid="${h.hid}" style="font-size:12px; margin-bottom:8px;">
           ${(h.comments || []).map(c => `<div style="margin-bottom:4px;"><b>${escHtml(c.by)}</b> · <span style="opacity:0.6;">${new Date(c.at).toLocaleString()}</span><br>${escHtml(c.text)}</div>`).join('') || '<div style="opacity:0.6;">No comments yet.</div>'}
         </div>
@@ -7374,6 +7564,265 @@ document.getElementById('profSearch').addEventListener('input', () => {
   clearTimeout(window._profSearchDebounce);
   window._profSearchDebounce = setTimeout(renderProfiles, 150);
 });
+
+/* ═══════════════════════════ RECRUITMENT PIPELINE (openings + kanban) ═══════════════════════════ */
+function openingLabel(o) { return `${o.deptName} · ${o.roleName}`; }
+function openingHiredCount(o) { return (state.history || []).filter(h => h.openingId === o.id && h.stage === 'hired').length; }
+function openingPipelineCount(o) { return (state.history || []).filter(h => h.openingId === o.id && h.stage !== 'rejected' && h.stage !== 'hired').length; }
+
+function renderOpeningSelects() {
+  const dSel = document.getElementById('openDeptSelect');
+  const rSel = document.getElementById('openRoleSelect');
+  if (!dSel) return;
+  const prevD = dSel.value;
+  dSel.innerHTML = state.departments.map(d => `<option value="${d.id}">${escHtml(d.name)}</option>`).join('');
+  if (state.departments.some(d => d.id === prevD)) dSel.value = prevD;
+  const dept = findDept(dSel.value);
+  const prevR = rSel.value;
+  rSel.innerHTML = (dept ? dept.roles : []).map(r => `<option value="${r.id}">${escHtml(r.name)}</option>`).join('');
+  if (dept && dept.roles.some(r => r.id === prevR)) rSel.value = prevR;
+}
+document.getElementById('openDeptSelect').addEventListener('change', renderOpeningSelects);
+
+document.getElementById('addOpeningBtn').addEventListener('click', () => {
+  if (state.user && state.user.guest) { notify('Guest accounts are view-only — log in as a team member to create openings.', false); return; }
+  const dept = findDept(document.getElementById('openDeptSelect').value);
+  const role = dept && dept.roles.find(r => r.id === document.getElementById('openRoleSelect').value);
+  if (!dept || !role) { notify('Pick a department and role for the opening (add them on the Roles tab first if needed).', false); return; }
+  const headcount = Math.max(1, parseInt(document.getElementById('openHeadcount').value, 10) || 1);
+  state.openings.push({
+    id: 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    deptName: dept.name, roleName: role.name,
+    headcount,
+    manager: document.getElementById('openManager').value.trim(),
+    target: document.getElementById('openTarget').value || '',
+    status: 'open',
+    openedAt: new Date().toISOString(),
+    closedAt: '',
+  });
+  // Retro-link existing unlinked candidacies for this dept+role to the new opening.
+  (state.history || []).forEach(h => {
+    if (!h.openingId && h.dept === dept.name && (h.roleName === role.name || h.role === role.name)) h.openingId = state.openings[state.openings.length - 1].id;
+  });
+  document.getElementById('openManager').value = '';
+  persistSession();
+  renderPipeline();
+});
+
+function renderOpenings() {
+  const body = document.getElementById('openingsBody');
+  if (!body) return;
+  const open = (state.openings || []).filter(o => o.status === 'open').length;
+  document.getElementById('openingsCount').textContent = `${open} open`;
+  if ((state.openings || []).length === 0) {
+    body.innerHTML = '<tr><td colspan="8" style="opacity:0.6;">No openings yet — create one above to start tracking a requisition end-to-end.</td></tr>';
+    return;
+  }
+  body.innerHTML = state.openings
+    .slice().sort((a, b) => (a.status === 'open' ? -1 : 1) - (b.status === 'open' ? -1 : 1) || new Date(b.openedAt) - new Date(a.openedAt))
+    .map(o => {
+      const hired = openingHiredCount(o), inPipe = openingPipelineCount(o);
+      const filled = hired >= o.headcount;
+      return `<tr>
+        <td><b>${escHtml(openingLabel(o))}</b></td>
+        <td style="font-size:12px;">${escHtml(o.manager || '—')}</td>
+        <td>${o.headcount}</td>
+        <td style="color:var(--approved); font-weight:700;">${hired}${filled ? ' ✓' : ''}</td>
+        <td>${inPipe}</td>
+        <td style="font-size:12px;">${o.target ? new Date(o.target).toLocaleDateString() : '—'}</td>
+        <td>${o.status === 'open'
+          ? '<span class="sched-status-pill invited">Open</span>'
+          : '<span class="sched-status-pill confirmed">Closed</span>'}</td>
+        <td>${o.status === 'open'
+          ? `<button class="sched-mini-btn opening-close" data-oid="${o.id}">Close</button>`
+          : `<button class="sched-mini-btn opening-reopen" data-oid="${o.id}">Reopen</button>`}</td>
+      </tr>`;
+    }).join('');
+  body.querySelectorAll('.opening-close').forEach(btn => btn.addEventListener('click', () => {
+    const o = state.openings.find(x => x.id === btn.dataset.oid);
+    if (!o) return;
+    o.status = 'closed'; o.closedAt = new Date().toISOString();
+    persistSession(); renderPipeline();
+  }));
+  body.querySelectorAll('.opening-reopen').forEach(btn => btn.addEventListener('click', () => {
+    const o = state.openings.find(x => x.id === btn.dataset.oid);
+    if (!o) return;
+    o.status = 'open'; o.closedAt = '';
+    persistSession(); renderPipeline();
+  }));
+}
+
+function renderPipeDeptAndOpeningFilters() {
+  const dSel = document.getElementById('pipeDeptFilter');
+  const oSel = document.getElementById('pipeOpeningFilter');
+  const prevD = dSel.value, prevO = oSel.value;
+  const deptNames = [...new Set([...state.departments.map(d => d.name), ...(state.history || []).map(h => h.dept).filter(Boolean)])].sort();
+  dSel.innerHTML = '<option value="">All departments</option>' + deptNames.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${escHtml(n)}</option>`).join('');
+  if ([...dSel.options].some(x => x.value === prevD)) dSel.value = prevD;
+  oSel.innerHTML = '<option value="">All openings</option>' + (state.openings || []).map(o => `<option value="${o.id}">${escHtml(openingLabel(o))}${o.status === 'closed' ? ' (closed)' : ''}</option>`).join('');
+  if ([...oSel.options].some(x => x.value === prevO)) oSel.value = prevO;
+}
+
+function renderPipelineMetrics() {
+  const hist = state.history || [];
+  const openings = (state.openings || []).filter(o => o.status === 'open');
+  const inPipe = hist.filter(h => h.stage !== 'rejected' && h.stage !== 'hired').length;
+  const offers = hist.filter(h => h.stage === 'offer').length;
+  const hires = hist.filter(h => h.stage === 'hired');
+  // Time-to-hire = screening date → date the card reached "hired"
+  const days = hires.map(h => {
+    const hiredAt = (h.stageHistory || []).filter(s => s.stage === 'hired').map(s => +new Date(s.at)).pop();
+    return hiredAt ? Math.max(0, Math.round((hiredAt - +new Date(h.ts)) / 86400000)) : null;
+  }).filter(d => d !== null);
+  const avgDays = days.length ? Math.round(days.reduce((a, b) => a + b, 0) / days.length) : null;
+  document.getElementById('pipeMetricsSince').textContent = hist.length ? `${hist.length} candidacies tracked` : 'Nothing tracked yet';
+  document.getElementById('pipeMetrics').innerHTML = `
+    <div class="summary-card"><div class="summary-card__label">Open Positions</div><div class="summary-card__num">${openings.reduce((a, o) => a + o.headcount, 0)}</div><div class="summary-card__sub">${openings.length} opening${openings.length !== 1 ? 's' : ''}</div></div>
+    <div class="summary-card"><div class="summary-card__label">In Pipeline</div><div class="summary-card__num">${inPipe}</div><div class="summary-card__sub">Screened → Offer</div></div>
+    <div class="summary-card borderline"><div class="summary-card__label">Offers Out</div><div class="summary-card__num">${offers}</div><div class="summary-card__sub">Awaiting acceptance</div></div>
+    <div class="summary-card approved"><div class="summary-card__label">Hired</div><div class="summary-card__num">${hires.length}</div><div class="summary-card__sub">${avgDays !== null ? 'Avg ' + avgDays + ' days to hire' : 'All time'}</div></div>`;
+}
+
+function renderKanban() {
+  const board = document.getElementById('kanbanBoard');
+  if (!board) return;
+  const deptF = document.getElementById('pipeDeptFilter').value;
+  const openF = document.getElementById('pipeOpeningFilter').value;
+  const showRejected = document.getElementById('pipeShowRejected').checked;
+  const isGuest = !!(state.user && state.user.guest);
+  const rows = (state.history || [])
+    .filter(h => (!deptF || h.dept === deptF) && (!openF || h.openingId === openF));
+  document.getElementById('pipeBoardCount').textContent = `${rows.length} candidacies`;
+  const cols = showRejected ? [...STAGES, 'rejected'] : STAGES;
+  board.innerHTML = cols.map(stage => {
+    const cards = rows.filter(h => h.stage === stage).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    return `<div class="kanban-col ${stage === 'hired' ? 'hired' : ''} ${stage === 'rejected' ? 'rejectedcol' : ''}">
+      <div class="kanban-col__head">
+        <span class="kanban-col__title">${STAGE_LABEL[stage]}</span>
+        <span class="kanban-col__count">${cards.length}</span>
+      </div>
+      ${cards.map(h => {
+        const idx = STAGES.indexOf(h.stage);
+        const opening = (state.openings || []).find(o => o.id === h.openingId);
+        const lastMove = (h.stageHistory || []).slice(-1)[0];
+        const moveBtns = isGuest ? '' : `<div class="kanban-move">
+          ${h.stage === 'rejected'
+            ? `<button title="Back to Screened" data-move="screened" data-hid="${h.hid}">↺</button>`
+            : `<button title="Move back" data-move="${idx > 0 ? STAGES[idx - 1] : ''}" data-hid="${h.hid}" ${idx <= 0 ? 'disabled' : ''}>‹</button>
+               <button title="Move forward" data-move="${idx < STAGES.length - 1 ? STAGES[idx + 1] : ''}" data-hid="${h.hid}" ${idx >= STAGES.length - 1 ? 'disabled' : ''}>›</button>
+               <button title="Reject" data-move="rejected" data-hid="${h.hid}" style="color:var(--rejected);">✕</button>`}
+        </div>`;
+        return `<div class="kanban-card">
+          <div class="kanban-card__name">${escHtml(h.name)}</div>
+          <div class="kanban-card__meta">${escHtml(h.dept)} · ${escHtml(h.roleName || h.role)}</div>
+          ${opening ? `<span class="opening-pill">📌 ${escHtml(opening.manager || 'Opening')}</span>` : ''}
+          <div class="kanban-card__foot">
+            <span class="kanban-card__score">${h.score ?? '—'}/100</span>
+            ${moveBtns}
+          </div>
+          ${lastMove ? `<div class="kanban-card__stagehist">${STAGE_LABEL[lastMove.stage]} · ${escHtml(lastMove.by)} · ${new Date(lastMove.at).toLocaleDateString()}</div>` : ''}
+        </div>`;
+      }).join('') || '<div style="opacity:0.45; font-size:12px; text-align:center; padding:16px 0;">—</div>'}
+    </div>`;
+  }).join('');
+  board.querySelectorAll('.kanban-move button[data-move]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!btn.dataset.move) return;
+      setStage(btn.dataset.hid, btn.dataset.move);
+    });
+  });
+}
+
+function renderPipeline() {
+  if (!document.getElementById('kanbanBoard')) return;
+  migrateHistory();
+  renderOpeningSelects();
+  renderOpenings();
+  renderPipeDeptAndOpeningFilters();
+  renderPipelineMetrics();
+  renderKanban();
+}
+document.getElementById('pipeDeptFilter').addEventListener('change', renderKanban);
+document.getElementById('pipeOpeningFilter').addEventListener('change', renderKanban);
+document.getElementById('pipeShowRejected').addEventListener('change', renderKanban);
+
+/* ═══════════════════════════ DATA & PRIVACY (GDPR / UAE PDPL support) ═══════════════════════════ */
+function renderPrivacyPanel() {
+  const sel = document.getElementById('retentionSelect');
+  const toggle = document.getElementById('storeCvToggle');
+  if (!sel) return;
+  const p = state.privacy || { retentionMonths: 0, storeCvText: true };
+  sel.value = String(p.retentionMonths || 0);
+  toggle.checked = p.storeCvText !== false;
+  const n = (state.history || []).length;
+  document.getElementById('privacyStatus').textContent =
+    p.retentionMonths > 0 ? `Retention: ${p.retentionMonths} months · ${n} records` : `No auto-retention · ${n} records`;
+}
+
+/* Storage limitation: remove candidacy records older than the retention window,
+   and strip CV text when minimisation is switched off. Returns counts for reporting. */
+function applyRetention() {
+  const p = state.privacy || {};
+  let removed = 0, stripped = 0;
+  if (p.retentionMonths > 0) {
+    const cutoff = Date.now() - p.retentionMonths * 30.44 * 86400000;
+    const before = (state.history || []).length;
+    state.history = (state.history || []).filter(h => +new Date(h.ts) >= cutoff);
+    removed = before - state.history.length;
+  }
+  if (p.storeCvText === false) {
+    (state.history || []).forEach(h => { if (h.cvText) { h.cvText = ''; stripped++; } });
+  }
+  if (removed || stripped) {
+    persistSession();
+    renderReport(); renderProfiles(); renderPipeline(); updateMatchCount();
+  }
+  return { removed, stripped };
+}
+
+document.getElementById('retentionSelect').addEventListener('change', e => {
+  if (state.user && state.user.guest) { notify('Guests can\'t change privacy settings.', false); renderPrivacyPanel(); return; }
+  state.privacy = state.privacy || {};
+  state.privacy.retentionMonths = parseInt(e.target.value, 10) || 0;
+  persistSession();
+  renderPrivacyPanel();
+});
+document.getElementById('storeCvToggle').addEventListener('change', e => {
+  if (state.user && state.user.guest) { notify('Guests can\'t change privacy settings.', false); renderPrivacyPanel(); return; }
+  state.privacy = state.privacy || {};
+  state.privacy.storeCvText = !!e.target.checked;
+  persistSession();
+});
+document.getElementById('purgeNowBtn').addEventListener('click', () => {
+  if (state.user && state.user.guest) { notify('Guests can\'t run retention purges.', false); return; }
+  const p = state.privacy || {};
+  if (!(p.retentionMonths > 0) && p.storeCvText !== false) { notify('Set a retention period (or uncheck CV storage) first.', false); return; }
+  if (!confirm('Apply retention now? Records older than the retention window are permanently deleted for the whole team.' + (p.storeCvText === false ? ' Stored CV text will also be removed.' : ''))) return;
+  const { removed, stripped } = applyRetention();
+  notify(`Retention applied — ${removed} record${removed !== 1 ? 's' : ''} deleted${stripped ? `, CV text removed from ${stripped}` : ''}.`, false);
+  renderPrivacyPanel();
+  renderDashboard();
+});
+
+/* Data-subject access request (DSAR): export everything held about one candidate as JSON. */
+function exportCandidateData(name) {
+  const records = (state.history || []).filter(h => h.name === name);
+  const invites = (state.sched.invites || []).filter(i => i.candidateName === name);
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    exportedBy: (state.user && state.user.fullName) || 'HR user',
+    dataSubject: name,
+    note: 'Complete record of personal data held about this candidate in TalentScope, exported for a data-subject access request (GDPR Art. 15 / UAE PDPL Art. 13).',
+    screeningRecords: records,
+    interviewInvitations: invites,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `DSAR_${name.replace(/[^\w]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 function deleteProfile(name) {
   if (!confirm(`Delete "${name}" everywhere?\n\nThis removes all their screening history records, current results, and any interview invitation. This cannot be undone.`)) return;
@@ -7439,6 +7888,10 @@ function snapshotState() {
     // Departments carry each role's saved JD — synced so the whole team shares one
     // JD library and nobody re-uploads a JD that's already on file.
     departments: state.departments || [],
+    // Job openings / requisitions for pipeline tracking.
+    openings: state.openings || [],
+    // GDPR / PDPL controls (retention + minimisation) — shared workspace-wide.
+    privacy: state.privacy || { retentionMonths: 0, storeCvText: true },
   };
 }
 
@@ -7449,7 +7902,11 @@ function applySnapshot(s) {
     state.results = Array.isArray(s.results) ? s.results : [];
     state.jdName = s.jdName || state.jdName;
     state.history = Array.isArray(s.history) ? s.history : (state.history || []);
+    if (Array.isArray(s.openings)) state.openings = s.openings;
+    if (s.privacy && typeof s.privacy === 'object') state.privacy = Object.assign({ retentionMonths: 0, storeCvText: true }, s.privacy);
     migrateHistory();
+    applyRetention();
+    renderPrivacyPanel();
     if (Array.isArray(s.departments) && s.departments.length > 0) {
       state.departments = s.departments;
       if (!findDept(state.selectedDeptId)) state.selectedDeptId = state.departments[0]?.id || '';
@@ -7460,13 +7917,14 @@ function applySnapshot(s) {
     if (state.results.length > 0) renderResults();
     renderReport();
     renderProfiles();
+    renderPipeline();
     renderMatchDeptSelect();
     updateMatchCount();
     if (state.sched.availFileName) {
       const summary = document.getElementById('availSummary');
       summary.style.display = '';
       const interviewers = [...new Set(state.sched.slots.map(x => x.interviewer))];
-      summary.innerHTML = `✓ <b>${state.sched.availFileName}</b> (shared) — ${state.sched.slots.length} slots across ${interviewers.length} interviewer${interviewers.length !== 1 ? 's' : ''}.`;
+      summary.innerHTML = `✓ <b>${escHtml(state.sched.availFileName)}</b> (shared) — ${state.sched.slots.length} slots across ${interviewers.length} interviewer${interviewers.length !== 1 ? 's' : ''}.`;
     }
     renderSchedTable();
     showSchedulingIfReady();
@@ -7546,8 +8004,11 @@ function clearSavedSession() { try { localStorage.removeItem('ts_session'); } ca
 // Initial paint of the new department-driven panels
 renderReport();
 renderProfiles();
+renderPipeline();
 renderMatchDeptSelect();
 updateMatchCount();
+renderPrivacyPanel();
+applyRetention();   // storage-limitation pass on every load
 applyGuestRestrictions();
 
 restoreSession();
