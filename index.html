@@ -15,7 +15,7 @@
 <script>
 /* Build stamp + fatal-error banner. This runs before the app script, so even a
    crash during page load produces a visible red banner instead of silence. */
-window.__TS_BUILD = '2026-07-18.10';
+window.__TS_BUILD = '2026-07-18.11';
 window.addEventListener('error', function (e) {
   try {
     if (document.getElementById('tsFatalBanner')) return;
@@ -3129,6 +3129,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <a class="active" data-view="screening">Screening</a>
         <a data-view="roles">Roles</a>
         <a data-view="pipeline">Pipeline</a>
+        <a data-view="interviewer">Interviewer</a>
         <a data-view="dashboard">Candidates</a>
         <a data-view="reports">Reports</a>
         <a data-scroll="panelDeptMatch">Find Matches</a>
@@ -3523,7 +3524,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <div class="table-scroll">
           <table>
             <thead>
-              <tr><th>Role</th><th>CVs Uploaded</th><th>Approved</th><th>Rejected</th><th>On Hold</th><th>Approval Rate</th><th>Last Screening</th></tr>
+              <tr><th>Department</th><th>Role</th><th>CVs Uploaded</th><th>Approved</th><th>Rejected</th><th>On Hold</th><th>Approval Rate</th><th>Last Screening</th></tr>
             </thead>
             <tbody id="dashRoleBody"></tbody>
           </table>
@@ -3783,14 +3784,49 @@ tbody td { padding: 14px 16px; vertical-align: top; }
       <p class="panel__desc">Every candidacy (candidate × role) moves left to right: Screened → Shortlisted → Interview → Offer → Hired. Use ‹ › on a card to move it; every move is stamped with who and when.</p>
       <div class="report-toolbar">
         <div class="sched-field"><label>Department</label><select id="pipeDeptFilter"><option value="">All departments</option></select></div>
+        <div class="sched-field"><label>Role</label><select id="pipeRoleFilter"><option value="">All roles</option></select></div>
         <div class="sched-field"><label>Opening</label><select id="pipeOpeningFilter"><option value="">All openings</option></select></div>
         <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; padding-bottom:9px;">
           <input type="checkbox" id="pipeShowRejected"> Show rejected
         </label>
       </div>
+      <div class="results-table" style="margin-bottom:16px;"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Department</th><th>Role</th><th>Screened</th><th>Shortlisted</th><th>Interview</th><th>Offer</th><th>Hired</th><th>Rejected</th></tr></thead>
+          <tbody id="pipeSummaryBody"></tbody>
+        </table>
+      </div></div>
       <div class="kanban" id="kanbanBoard"></div>
     </section>
 
+  </div>
+
+  <!-- ═══ INTERVIEWER PACK ═══ -->
+  <div class="page" id="viewInterviewer" style="display:none;">
+    <section class="panel">
+      <div class="panel__head">
+        <div class="panel__title">
+          <span class="panel__number">§ I</span>
+          <span class="panel__name">Interviewer <em>Pack</em></span>
+        </div>
+        <span class="panel__count" id="intCount">0 shortlisted</span>
+      </div>
+      <p class="panel__desc">Pick a department and role — you get a shareable brief of the shortlisted candidates (name, experience summary, key skills, score), an email pre-addressed to the interviewer, and a one-click CV pack for that role to attach.</p>
+      <div class="report-toolbar">
+        <div class="sched-field"><label>Department</label><select id="intDeptSelect"></select></div>
+        <div class="sched-field"><label>Role</label><select id="intRoleSelect"></select></div>
+        <div class="sched-field"><label>Interviewer email (optional)</label><input type="email" id="intEmail" placeholder="interviewer@company.com"></div>
+        <button class="btn-export" id="intEmailBtn">✉ Email brief via Outlook</button>
+        <button class="btn-export" id="intPackBtn">⬇ Download CV pack (.zip)</button>
+      </div>
+      <p style="font-size:11.5px; color:var(--ink-3); margin-top:2px;">The pack contains the brief plus each candidate's CV as extracted text (originals aren't stored) — attach it to the Outlook email before sending.</p>
+      <div class="results-table"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Candidate</th><th>Experience Summary</th><th>Key Skills</th><th>Score</th><th>Stage</th></tr></thead>
+          <tbody id="intBody"></tbody>
+        </table>
+      </div></div>
+    </section>
   </div>
 
   <!-- ═══ AI CHAT ASSISTANT ═══ -->
@@ -4310,6 +4346,11 @@ function showView(viewName) {
   if (reports) {
     reports.style.display = viewName === 'reports' ? '' : 'none';
     if (viewName === 'reports' && typeof renderReport === 'function') renderReport();
+  }
+  const intv = document.getElementById('viewInterviewer');
+  if (intv) {
+    intv.style.display = viewName === 'interviewer' ? '' : 'none';
+    if (viewName === 'interviewer' && typeof renderInterviewer === 'function') renderInterviewer();
   }
   document.querySelectorAll('.main-nav a[data-view]').forEach(a => {
     a.classList.toggle('active', a.dataset.view === viewName);
@@ -7244,6 +7285,8 @@ function recordHistory() {
       employeeId: '',                       // fillable later from the Department Reports table
       uploadedBy: r.uploadedBy || '',
       score: r.score,
+      experience: r.experience && r.experience !== '—' ? r.experience : '',
+      skills: (r.matchedSkills && r.matchedSkills.length ? r.matchedSkills : (r.skills || [])).slice(0, 10),
       final: r.final,
       status,
       stage,
@@ -7490,8 +7533,9 @@ function renderDashboard() {
 
   const roles = {};
   hist.forEach(h => {
-    if (!roles[h.role]) roles[h.role] = { total: 0, approved: 0, rejected: 0, hold: 0, last: h.ts };
-    const R = roles[h.role];
+    const key = (h.dept || '—') + '||' + (h.roleName || h.role || '—');
+    if (!roles[key]) roles[key] = { dept: h.dept || '—', roleName: h.roleName || h.role || '—', total: 0, approved: 0, rejected: 0, hold: 0, last: h.ts };
+    const R = roles[key];
     R.total++;
     R[historyStatus(h)]++;
     if (h.ts > R.last) R.last = h.ts;
@@ -7500,14 +7544,15 @@ function renderDashboard() {
   roleBody.innerHTML = Object.entries(roles)
     .sort((a, b) => b[1].total - a[1].total)
     .map(([role, R]) => `<tr>
-      <td><b>${escHtml(role)}</b></td>
+      <td>${escHtml(R.dept)}</td>
+      <td><b>${escHtml(R.roleName)}</b></td>
       <td>${R.total}</td>
       <td style="color:var(--approved); font-weight:700;">${R.approved}</td>
       <td style="color:var(--rejected); font-weight:700;">${R.rejected}</td>
       <td style="color:var(--borderline); font-weight:700;">${R.hold}</td>
       <td>${R.total ? Math.round(R.approved / R.total * 100) : 0}%</td>
       <td style="font-size:12px;">${new Date(R.last).toLocaleDateString()}</td>
-    </tr>`).join('') || '<tr><td colspan="7" style="opacity:0.6;">Run a screening and every CV will be tracked here.</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="8" style="opacity:0.6;">Run a screening and every CV will be tracked here.</td></tr>';
 
   const roleSel = document.getElementById('dashRoleSelect');
   const prevRole = roleSel.value;
@@ -7804,6 +7849,11 @@ function renderPipeDeptAndOpeningFilters() {
   if ([...dSel.options].some(x => x.value === prevD)) dSel.value = prevD;
   oSel.innerHTML = '<option value="">All openings</option>' + (state.openings || []).map(o => `<option value="${o.id}">${escHtml(openingLabel(o))}${o.status === 'closed' ? ' (closed)' : ''}</option>`).join('');
   if ([...oSel.options].some(x => x.value === prevO)) oSel.value = prevO;
+  const rSel = document.getElementById('pipeRoleFilter');
+  const prevR = rSel.value;
+  const roleNames = [...new Set((state.history || []).map(h => h.roleName || h.role).filter(Boolean))].sort();
+  rSel.innerHTML = '<option value="">All roles</option>' + roleNames.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  if ([...rSel.options].some(x => x.value === prevR)) rSel.value = prevR;
 }
 
 function renderPipelineMetrics() {
@@ -7830,11 +7880,25 @@ function renderKanban() {
   const board = document.getElementById('kanbanBoard');
   if (!board) return;
   const deptF = document.getElementById('pipeDeptFilter').value;
+  const roleF = document.getElementById('pipeRoleFilter').value;
   const openF = document.getElementById('pipeOpeningFilter').value;
   const showRejected = document.getElementById('pipeShowRejected').checked;
   const isGuest = !!(state.user && state.user.guest);
   const rows = (state.history || [])
-    .filter(h => (!deptF || h.dept === deptF) && (!openF || h.openingId === openF));
+    .filter(h => (!deptF || h.dept === deptF) && (!roleF || (h.roleName || h.role) === roleF) && (!openF || h.openingId === openF));
+  // By-department/role stage summary
+  const sumBody = document.getElementById('pipeSummaryBody');
+  if (sumBody) {
+    const groups = {};
+    rows.forEach(h => {
+      const key = (h.dept || '—') + '||' + (h.roleName || h.role || '—');
+      if (!groups[key]) groups[key] = { dept: h.dept || '—', role: h.roleName || h.role || '—', screened: 0, shortlisted: 0, interview: 0, offer: 0, hired: 0, rejected: 0 };
+      groups[key][h.stage] = (groups[key][h.stage] || 0) + 1;
+    });
+    sumBody.innerHTML = Object.values(groups).sort((a, b) => a.dept.localeCompare(b.dept) || a.role.localeCompare(b.role))
+      .map(g => `<tr><td>${escHtml(g.dept)}</td><td><b>${escHtml(g.role)}</b></td><td>${g.screened}</td><td>${g.shortlisted}</td><td>${g.interview}</td><td>${g.offer}</td><td style="color:var(--approved); font-weight:700;">${g.hired}</td><td style="color:var(--rejected);">${g.rejected}</td></tr>`).join('')
+      || '<tr><td colspan="8" style="opacity:0.6;">No candidacies match the filters yet.</td></tr>';
+  }
   document.getElementById('pipeBoardCount').textContent = `${rows.length} candidacies`;
   const cols = showRejected ? [...STAGES, 'rejected'] : STAGES;
   board.innerHTML = cols.map(stage => {
@@ -7890,6 +7954,7 @@ function renderPipeline() {
   renderKanban();
 }
 document.getElementById('pipeDeptFilter').addEventListener('change', renderKanban);
+document.getElementById('pipeRoleFilter').addEventListener('change', renderKanban);
 document.getElementById('pipeOpeningFilter').addEventListener('change', renderKanban);
 document.getElementById('pipeShowRejected').addEventListener('change', renderKanban);
 
@@ -7970,6 +8035,99 @@ function exportCandidateData(name) {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+/* ═══════════════════════════ INTERVIEWER PACK ═══════════════════════════ */
+function intShortlist() {
+  const dept = document.getElementById('intDeptSelect').value;
+  const role = document.getElementById('intRoleSelect').value;
+  // Latest record per candidate for this dept+role, at Shortlisted or Interview stage
+  const byName = new Map();
+  (state.history || []).forEach(h => {
+    if (h.dept !== dept || (h.roleName || h.role) !== role) return;
+    if (!['shortlisted', 'interview'].includes(h.stage)) return;
+    const k = (h.name || '').toLowerCase();
+    const prev = byName.get(k);
+    if (!prev || new Date(h.ts) > new Date(prev.ts)) byName.set(k, h);
+  });
+  return [...byName.values()].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+}
+function renderIntSelects() {
+  const dSel = document.getElementById('intDeptSelect');
+  const rSel = document.getElementById('intRoleSelect');
+  if (!dSel) return;
+  const prevD = dSel.value, prevR = rSel.value;
+  const depts = [...new Set([...state.departments.map(d => d.name), ...(state.history || []).map(h => h.dept).filter(Boolean)])].sort();
+  dSel.innerHTML = depts.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  if ([...dSel.options].some(o => o.value === prevD)) dSel.value = prevD;
+  const dObj = state.departments.find(d => d.name === dSel.value);
+  const roleNames = [...new Set([...(dObj ? dObj.roles.map(r => r.name) : []),
+    ...(state.history || []).filter(h => h.dept === dSel.value).map(h => h.roleName || h.role).filter(Boolean)])].sort();
+  rSel.innerHTML = roleNames.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  if ([...rSel.options].some(o => o.value === prevR)) rSel.value = prevR;
+}
+function renderInterviewer() {
+  const body = document.getElementById('intBody');
+  if (!body) return;
+  migrateHistory();
+  renderIntSelects();
+  const rows = intShortlist();
+  document.getElementById('intCount').textContent = `${rows.length} shortlisted`;
+  body.innerHTML = rows.map(h => `<tr>
+    <td><b>${escHtml(h.name)}</b>${h.email ? `<br><span style="font-size:11px; opacity:0.7;">${escHtml(h.email)}</span>` : ''}</td>
+    <td style="font-size:12px; max-width:340px;">${escHtml(h.experience || h.reason || '—')}</td>
+    <td style="font-size:12px;">${(h.skills || []).map(s => escHtml(s)).join(' · ') || '—'}</td>
+    <td><b>${h.score ?? '—'}</b>/100</td>
+    <td>${STAGE_LABEL[h.stage] || h.stage}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="opacity:0.6;">No shortlisted candidates for this role yet — approve or shortlist candidates on the Pipeline board first.</td></tr>';
+}
+document.getElementById('intDeptSelect').addEventListener('change', () => { renderIntSelects(); renderInterviewer(); });
+document.getElementById('intRoleSelect').addEventListener('change', renderInterviewer);
+
+function intBriefText() {
+  const dept = document.getElementById('intDeptSelect').value;
+  const role = document.getElementById('intRoleSelect').value;
+  const rows = intShortlist();
+  const lines = [`Interview brief — ${dept} · ${role}`, `Prepared ${new Date().toLocaleDateString()} · ${rows.length} shortlisted candidate(s)`, ''];
+  rows.forEach((h, i) => {
+    lines.push(`${i + 1}. ${h.name}  (score ${h.score ?? '—'}/100, ${STAGE_LABEL[h.stage] || h.stage})`);
+    if (h.email) lines.push(`   Email: ${h.email}`);
+    lines.push(`   Experience: ${h.experience || h.reason || '—'}`);
+    lines.push(`   Key skills: ${(h.skills || []).join(', ') || '—'}`);
+    lines.push('');
+  });
+  lines.push('CVs are in the attached pack (extracted text). Generated by TalentScope.');
+  return lines.join('\n');
+}
+document.getElementById('intEmailBtn').addEventListener('click', () => {
+  const rows = intShortlist();
+  if (!rows.length) { notify('No shortlisted candidates for this role yet.', false); return; }
+  const dept = document.getElementById('intDeptSelect').value;
+  const role = document.getElementById('intRoleSelect').value;
+  const to = document.getElementById('intEmail').value.trim();
+  const subject = encodeURIComponent(`Interview brief — ${role} (${rows.length} candidates)`);
+  const body = encodeURIComponent(intBriefText());
+  window.location.href = `mailto:${encodeURIComponent(to)}?subject=${subject}&body=${body}`;
+  notify('✓ Outlook opened with the brief — attach the CV pack (⬇ button) before sending.', false);
+});
+document.getElementById('intPackBtn').addEventListener('click', async () => {
+  const rows = intShortlist();
+  if (!rows.length) { notify('No shortlisted candidates for this role yet.', false); return; }
+  if (typeof JSZip === 'undefined') { notify('Zip library failed to load — refresh and retry.', false); return; }
+  const role = document.getElementById('intRoleSelect').value;
+  const zip = new JSZip();
+  zip.file('_Interview_Brief.txt', intBriefText());
+  rows.forEach(h => {
+    const safe = (h.name || 'candidate').replace(/[^\w]+/g, '_');
+    zip.file(`CV_${safe}.txt`, (h.cvText && h.cvText.trim()) ? h.cvText : '(CV text was not stored for this candidate — data minimisation is on, or the record predates CV storage.)');
+  });
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `InterviewPack_${role.replace(/[^\w]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.zip`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  notify('✓ CV pack downloaded — attach it to the Outlook email.', false);
+});
 
 function deleteProfile(name) {
   if (!confirm(`Delete "${name}" everywhere?\n\nThis removes all their screening history records, current results, and any interview invitation. This cannot be undone.`)) return;
