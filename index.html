@@ -15,7 +15,7 @@
 <script>
 /* Build stamp + fatal-error banner. This runs before the app script, so even a
    crash during page load produces a visible red banner instead of silence. */
-window.__TS_BUILD = '2026-07-18.9';
+window.__TS_BUILD = '2026-07-18.10';
 window.addEventListener('error', function (e) {
   try {
     if (document.getElementById('tsFatalBanner')) return;
@@ -8039,6 +8039,9 @@ function snapshotState() {
     openings: state.openings || [],
     // GDPR / PDPL controls (retention + minimisation) — shared workspace-wide.
     privacy: state.privacy || { retentionMonths: 0, storeCvText: true },
+    // Department schema marker: v2 = Infra and DevOps role set. Prevents the
+    // one-time migration from re-running once any client has written v2 state.
+    deptSchemaVersion: 2,
   };
 }
 
@@ -8056,10 +8059,25 @@ function applySnapshot(s) {
     renderPrivacyPanel();
     if (Array.isArray(s.departments) && s.departments.length > 0) {
       state.departments = s.departments;
-      migrateDefaultDepartments();
+      /* One-time forced migration to the Infra and DevOps role set:
+         any workspace whose stored state predates schema v2 gets its department
+         list replaced (screening history, reports, and pipeline are untouched),
+         then the updated list is pushed back to the server so it sticks for
+         the whole team. Departments created after this migration are safe —
+         the v2 marker prevents it from ever running again. */
+      if (s.deptSchemaVersion !== 2) {
+        state.departments = defaultDepartments();
+        state.deptSchemaVersion = 2;
+        SYNC.needsMigrationPush = true;
+      } else {
+        state.deptSchemaVersion = 2;
+        migrateDefaultDepartments();
+      }
       if (!findDept(state.selectedDeptId)) state.selectedDeptId = state.departments[0]?.id || '';
       if (!currentRole()) state.selectedRoleId = findDept(state.selectedDeptId)?.roles[0]?.id || '';
       renderDeptRoleSelects();
+    } else {
+      state.deptSchemaVersion = 2;
     }
     if (s.sched) state.sched = Object.assign({ slots: [], invites: [], availFileName: '' }, s.sched);
     if (state.results.length > 0) renderResults();
@@ -8079,7 +8097,13 @@ function applySnapshot(s) {
     const dash = document.getElementById('viewDashboard');
     if (dash && dash.style.display !== 'none') renderDashboard();
     return true;
-  } finally { SYNC.applyingRemote = false; }
+  } finally {
+    SYNC.applyingRemote = false;
+    if (SYNC.needsMigrationPush) {
+      SYNC.needsMigrationPush = false;
+      persistSession();   // writes the new Infra and DevOps set to the shared database
+    }
+  }
 }
 
 async function syncPull({ silentIfUnchanged = true } = {}) {
