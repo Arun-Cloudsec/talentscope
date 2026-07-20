@@ -7,14 +7,32 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { reportTelemetry } = require('./lib/telemetryClient');
 
 const app = express();
+app.disable('x-powered-by');
 app.use(express.json({ limit: '15mb' }));
+
+/* ── Security headers on every response ── */
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');                       // no embedding in iframes (clickjacking)
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (req.secure || req.get('x-forwarded-proto') === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 const PORT = process.env.PORT || 3000;
 const TEAM_CODE = process.env.TEAM_CODE || '';
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data', 'state.json');
+
+if (!TEAM_CODE) {
+  console.warn('⚠ TEAM_CODE is not set — the workspace API (candidate PII + AI proxy) is open to anyone with the URL. Set TEAM_CODE in Railway variables.');
+}
 
 /* ── Storage adapter ── */
 const usePg = !!process.env.DATABASE_URL;
@@ -69,11 +87,31 @@ async function writeState(state, updatedBy) {
   return updatedAt;
 }
 
-/* ── Optional shared-passcode gate for the API ── */
+/* ── Optional shared-passcode gate for the API (timing-safe comparison) ── */
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
+}
 function auth(req, res, next) {
   if (!TEAM_CODE) return next();
-  if (req.get('x-team-code') === TEAM_CODE) return next();
+  if (safeEqual(req.get('x-team-code') || '', TEAM_CODE)) return next();
   res.status(401).json({ error: 'Team code required' });
+}
+
+/* ── Simple in-memory rate limit for the AI proxy (per client IP) —
+   caps abuse of the server-held API keys if the URL leaks. ── */
+const RATE_LIMIT = { windowMs: 60_000, max: 60 };
+const rateBuckets = new Map();
+function aiRateLimit(req, res, next) {
+  const ip = (req.get('x-forwarded-for') || req.socket.remoteAddress || '').split(',')[0].trim();
+  const now = Date.now();
+  let b = rateBuckets.get(ip);
+  if (!b || now - b.start > RATE_LIMIT.windowMs) { b = { start: now, count: 0 }; rateBuckets.set(ip, b); }
+  b.count++;
+  if (rateBuckets.size > 5000) rateBuckets.clear(); // bound memory
+  if (b.count > RATE_LIMIT.max) return res.status(429).json({ error: 'Rate limit exceeded — try again in a minute' });
+  next();
 }
 
 /* ── AI proxy — keys live ONLY in Railway environment variables, never in the client ── */
@@ -83,7 +121,7 @@ const AI_KEYS = {
   google: process.env.GOOGLE_API_KEY || '',
 };
 
-app.post('/api/ai/claude', auth, async (req, res) => {
+app.post('/api/ai/claude', auth, aiRateLimit, async (req, res) => {
   if (!AI_KEYS.anthropic) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured on server' });
   const start = Date.now();
   const action = req.get('x-ai-action') || 'unspecified';
@@ -115,7 +153,7 @@ app.post('/api/ai/claude', auth, async (req, res) => {
   }
 });
 
-app.post('/api/ai/openai', auth, async (req, res) => {
+app.post('/api/ai/openai', auth, aiRateLimit, async (req, res) => {
   if (!AI_KEYS.openai) return res.status(503).json({ error: 'OPENAI_API_KEY not configured on server' });
   const start = Date.now();
   const action = req.get('x-ai-action') || 'unspecified';
@@ -143,7 +181,7 @@ app.post('/api/ai/openai', auth, async (req, res) => {
   }
 });
 
-app.post('/api/ai/gemini', auth, async (req, res) => {
+app.post('/api/ai/gemini', auth, aiRateLimit, async (req, res) => {
   if (!AI_KEYS.google) return res.status(503).json({ error: 'GOOGLE_API_KEY not configured on server' });
   const start = Date.now();
   const action = req.get('x-ai-action') || 'unspecified';
