@@ -1650,6 +1650,32 @@ tbody td { padding: 14px 16px; vertical-align: top; }
   flex-direction: column;
   gap: 4px;
 }
+/* ── JD Builder: house template ── */
+.jdb-house{border:1px solid rgba(120,190,140,.42);background:rgba(120,190,140,.09);
+  border-radius:11px;padding:14px 16px;margin-bottom:14px}
+.jdb-house.inactive{border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.05);opacity:.75}
+.jdb-house__name{font-size:14px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.jdb-house__ver{font-size:10px;font-weight:700;opacity:.55;letter-spacing:.05em;
+  border:1px solid rgba(255,255,255,.22);border-radius:99px;padding:2px 7px}
+.jdb-house__sub{font-size:12px;opacity:.72;margin-top:3px}
+.jdb-secs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 10px}
+.jdb-sec{display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:8px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);font-size:11.5px}
+.jdb-sec__tag{font-size:8.5px;font-weight:800;letter-spacing:.07em;padding:2px 6px;border-radius:99px;
+  background:rgba(255,255,255,.14);white-space:nowrap}
+.jdb-sec.fixed .jdb-sec__tag{background:rgba(120,190,140,.30)}
+.jdb-sec.ai .jdb-sec__tag{background:rgba(120,150,255,.30)}
+.jdb-sec__name{font-weight:600;white-space:nowrap}
+.jdb-house__note{font-size:11.5px;opacity:.65;line-height:1.55;border-top:1px dashed rgba(255,255,255,.14);
+  padding-top:9px}
+.jdb-custom{margin-bottom:6px}
+.jdb-custom>summary{cursor:pointer;font-size:12.5px;font-weight:700;opacity:.7;padding:6px 0;
+  list-style:none;user-select:none}
+.jdb-custom>summary::before{content:'▸ ';opacity:.6}
+.jdb-custom[open]>summary::before{content:'▾ '}
+.jdb-custom>summary:hover{opacity:1}
+.jdb-hint{font-weight:600;font-size:10.5px;opacity:.55;margin-left:6px}
+
 /* ── Run mode + model pickers ── */
 .run-mode{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .run-mode__label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.65}
@@ -4043,10 +4069,20 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <span class="panel__count" id="jdbTmplBadge">Not set</span>
       </div>
       <p class="panel__desc">
-        Upload your organisation's standard job-description template <b>once</b>. Every JD generated below
-        follows its structure, section order, headings, and house tone — so all your JDs come out consistent.
-        Shared with the whole team.
+        The <b>Inception standard JD template</b> is built in and always active — nothing to upload.
+        HR fills in the role below and the template supplies the structure, section order and house tone.
+        Brand sections (About Inception, What we look for, What working at Inception offers) are inserted
+        <b>word for word</b> and are never rewritten by the AI.
       </p>
+
+      <div class="jdb-house" id="jdbHousePanel"></div>
+
+      <details class="jdb-custom">
+        <summary>Use a different template instead</summary>
+        <p class="panel__desc" style="margin-top:10px">
+          Only needed for a JD that must not follow the Inception format. Uploading a template replaces
+          the built-in one for the whole team until you remove it.
+        </p>
 
       <label class="drop-zone" id="jdbTmplDrop">
         <input type="file" id="jdbTmplFile" accept=".pdf,.docx,.doc,.odt,.rtf,.txt,.md,.xlsx,.xls,.htm,.html,.eml">
@@ -4062,6 +4098,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <button class="sched-mini-btn" id="jdbTmplSave">💾 Save as team template</button>
       </div>
       <div class="jdb-tmpl" id="jdbTmplStatus" style="display:none;"></div>
+      </details>
     </section>
 
     <section class="panel">
@@ -4078,7 +4115,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
 
       <div class="jdb-grid">
         <div class="crit-field">
-          <label>Job title *</label>
+          <label>Job title * <span class="jdb-hint">→ title line &amp; opening</span></label>
           <input type="text" id="jdbTitle" placeholder="e.g. Senior Cloud Security Engineer">
         </div>
         <div class="crit-field">
@@ -4086,7 +4123,7 @@ tbody td { padding: 14px 16px; vertical-align: top; }
           <input type="text" id="jdbDept" placeholder="e.g. Infra and DevOps">
         </div>
         <div class="crit-field">
-          <label>Location / work model</label>
+          <label>Location <span class="jdb-hint">→ title line</span></label>
           <input type="text" id="jdbLocation" placeholder="e.g. Abu Dhabi, UAE — hybrid, 3 days on site">
         </div>
         <div class="crit-field">
@@ -4094,15 +4131,15 @@ tbody td { padding: 14px 16px; vertical-align: top; }
           <input type="text" id="jdbType" placeholder="e.g. Full-time, permanent">
         </div>
         <div class="crit-field">
-          <label>Experience required</label>
+          <label>Experience required <span class="jdb-hint">→ “Skills and attributes”</span></label>
           <input type="text" id="jdbExp" placeholder="e.g. 7+ years, with 3 in a lead role">
         </div>
         <div class="crit-field">
-          <label>Reports to</label>
+          <label>Reports to <span class="jdb-hint">→ opening paragraph</span></label>
           <input type="text" id="jdbReports" placeholder="e.g. Head of Infrastructure">
         </div>
         <div class="crit-field full">
-          <label>Key responsibilities</label>
+          <label>Key responsibilities <span class="jdb-hint">→ “Your key responsibilities”, grouped</span></label>
           <textarea id="jdbResp" placeholder="Rough notes are fine — one per line, bullets, or a paragraph. The AI will structure them."></textarea>
         </div>
         <div class="crit-field">
@@ -4119,7 +4156,11 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         </div>
         <div class="crit-field">
           <label>Education &amp; certifications</label>
-          <textarea id="jdbEdu" placeholder="e.g. Bachelor's in Computer Science or equivalent"></textarea>
+          <textarea id="jdbEdu" placeholder="e.g. Bachelor's in Computer Science or equivalent; Master's preferred"></textarea>
+        </div>
+        <div class="crit-field full">
+          <label>Tech stack <span class="jdb-hint">→ becomes the “Tech stack” section</span></label>
+          <textarea id="jdbTech" placeholder="Languages, frameworks, testing tools, CI/CD, cloud, databases, monitoring, collaboration… Rough notes are fine — the AI groups them by category. Leave blank and the section is omitted."></textarea>
         </div>
         <div class="crit-field full">
           <label>Anything else</label>
@@ -9811,15 +9852,161 @@ const JDB = {
   busy: false,
 };
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOUSE TEMPLATE — Inception standard JD
+   ═══════════════════════════════════════════════════════════════════════════
+   Pre-loaded and always available: HR never uploads it, they just fill in the
+   role. Sections are typed:
+
+     kind:'fixed' → brand / legal boilerplate, spliced in VERBATIM. The model
+                    never sees these as something to rewrite. Asking an LLM to
+                    "reproduce exactly" a company description works most of the
+                    time, and the times it doesn't you ship a paraphrased
+                    company blurb to candidates. Assembling it ourselves makes
+                    that impossible rather than unlikely.
+     kind:'ai'    → written per role from the HR brief.
+   ─────────────────────────────────────────────────────────────────────────── */
+const HOUSE_JD_TEMPLATE = {
+  id: 'inception-standard',
+  name: 'Inception — Standard JD',
+  version: '2026-08',
+  titleFormat: '{title}, Inception, {location}',
+  sections: [
+    { key: 'intro',        heading: '',                                  kind: 'ai',
+      hint: 'Opening paragraph, no heading. 4-6 sentences: what the role is responsible for, who it reports to, and why the expertise matters. Written in second person ("you will…").' },
+
+    { key: 'opportunity',  heading: 'The opportunity',                   kind: 'ai',
+      hint: '3-5 sentences framing the seniority and scope of the role, who it works with, and what the ideal candidate brings. Third person ("The {title} is a senior technical role focused on…").' },
+
+    { key: 'about',        heading: 'About Inception',                   kind: 'fixed',
+      body: "Inception, a G42 company, is the region's leading innovator of AI-powered domain-specific as well as industry-agnostic products, built on a rich heritage of research and development. Within the G42 ecosystem, Inception functions as the core intelligence layer — transforming data and compute infrastructure into real-world, applied AI solutions. Beyond its commercial endeavors, Inception is committed to creating positive societal impact. For more information, please visit www.inceptionai.ai" },
+
+    { key: 'responsibilities', heading: 'Your key responsibilities',     kind: 'ai',
+      hint: 'One short lead-in paragraph, then 5-7 GROUPED bullet categories. Each category is a bold-style label ending in a colon, followed by 3 indented sub-bullets. Mirror the template exactly: "- Category:" then "  - sub-bullet". Categories should suit the role (e.g. Strategy and Implementation, Delivery, Cross-Functional Collaboration, Compliance and Security, Innovation and Continuous Improvement, Documentation and Reporting).' },
+
+    { key: 'skills',       heading: 'Skills and attributes for success', kind: 'ai',
+      hint: '4-5 flat bullets covering: degree requirement (state the preferred higher degree too), minimum years of experience, proven track record in a comparable environment, and hands-on experience with the relevant tools or technologies.' },
+
+    { key: 'qualify',      heading: 'To qualify for the role you must have', kind: 'ai',
+      hint: '3-5 flat bullets of capability-level requirements — proficiencies, analytical and problem-solving strengths, leadership or mentoring ability. Shorter and more human than the Skills section; not a repeat of it.' },
+
+    { key: 'techstack',    heading: 'Tech stack',                        kind: 'ai',
+      hint: 'Flat bullets in "Category: item, item, item" form. Use only categories relevant to the role, drawn from: Programming languages, Frameworks, Testing Tools, CI/CD, Version Control, Cloud Services, Databases, Monitoring Tools, Collaboration, Other Technologies. Omit the section entirely if the brief gives no tooling.' },
+
+    { key: 'lookfor',      heading: 'What we look for',                  kind: 'fixed',
+      body: 'If you are a performance-driven, inquisitive mind with the agility to adapt to ambiguity, you will fit right in. You should be eager to explore opportunities to build meaningful collaborations with stakeholders and aspire to create unique customer-centric solutions. Bias for action and a passion to conquer new frontiers in the AI space is at the heart of the Inception community.' },
+
+    { key: 'offers',       heading: 'What working at Inception offers',  kind: 'fixed',
+      body: [
+        'Culture: An open, diverse and inclusive environment with a global vision that encourages personal growth and focuses on ground-breaking, industry-first innovations.',
+        'Career: Outstanding learning, development & growth opportunities via structured training programs and innovative, high-tech projects.',
+        'Work-Life: A hybrid work policy to strike the perfect balance between office and home.',
+        'Rewards: A competitive remuneration package with a host of perks including healthcare, education support, leave benefits and more.',
+      ].join('\n\n') },
+
+    { key: 'closing',      heading: '',                                  kind: 'fixed',
+      body: 'If you can confidently demonstrate that you meet the criteria above, please contact us as soon as possible.' },
+  ],
+};
+
+const HOUSE_AI_SECTIONS = HOUSE_JD_TEMPLATE.sections.filter(x => x.kind === 'ai');
+const HOUSE_FIXED_KEYS  = HOUSE_JD_TEMPLATE.sections.filter(x => x.kind === 'fixed').map(x => x.key);
+
+/** Is the house template the one in use? (vs an uploaded custom one) */
+function usingHouseTemplate() {
+  return !state.jdTemplate || state.jdTemplate.id === HOUSE_JD_TEMPLATE.id;
+}
+
+/** Pull the section JSON out of a model reply, tolerating fences and preamble.
+ *  Falls back to putting the whole reply in the opening section rather than
+ *  failing outright — a rough JD beats an error message. */
+function parseHouseParts(text) {
+  let raw = String(text || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  let obj = null;
+  try { obj = JSON.parse(raw); }
+  catch (e) {
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (m) { try { obj = JSON.parse(m[0]); } catch (e2) { obj = null; } }
+  }
+  if (!obj || typeof obj !== 'object') {
+    console.warn('[JD] house sections did not parse as JSON — using the raw reply as the opening.');
+    return { intro: raw };
+  }
+  const out = {};
+  HOUSE_AI_SECTIONS.forEach(sec => {
+    const v = obj[sec.key];
+    out[sec.key] = Array.isArray(v) ? v.join('\n') : String(v == null ? '' : v).trim();
+  });
+  return out;
+}
+
+/** Assemble the final JD: model output for the role sections, boilerplate
+ *  spliced in verbatim. Sections the model left empty are dropped rather than
+ *  emitted as an empty heading. */
+function assembleHouseJd(parts, inputs) {
+  const title = (inputs.title || 'Job Title').trim();
+  const location = (inputs.location || 'Abu Dhabi').trim();
+  const out = [HOUSE_JD_TEMPLATE.titleFormat
+    .replace('{title}', title)
+    .replace('{location}', location), ''];
+
+  HOUSE_JD_TEMPLATE.sections.forEach(sec => {
+    const body = sec.kind === 'fixed'
+      ? sec.body
+      : String((parts && parts[sec.key]) || '').trim();
+    if (!body) return;                       // nothing for this section — omit it
+    if (sec.heading) { out.push(sec.heading, ''); }
+    out.push(body, '');
+  });
+
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+
 function jdbEl(id) { return document.getElementById(id); }
 function jdbUser() { return (state.user && (state.user.fullName || state.user.name)) || 'HR user'; }
 
 /* ── Template ── */
+function renderHousePanel() {
+  const el = jdbEl('jdbHousePanel');
+  if (!el) return;
+  const active = usingHouseTemplate();
+  const rows = HOUSE_JD_TEMPLATE.sections.map(sec => {
+    const label = sec.heading || (sec.key === 'intro' ? 'Opening paragraph' : 'Closing line');
+    return `<div class="jdb-sec ${sec.kind}">
+      <span class="jdb-sec__tag">${sec.kind === 'fixed' ? 'FIXED' : 'PER ROLE'}</span>
+      <span class="jdb-sec__name">${escHtml(label)}</span>
+    </div>`;
+  }).join('');
+  el.className = 'jdb-house' + (active ? '' : ' inactive');
+  el.innerHTML = `
+    <div class="jdb-house__head">
+      <div>
+        <div class="jdb-house__name">${active ? '✓' : '○'} ${escHtml(HOUSE_JD_TEMPLATE.name)}
+          <span class="jdb-house__ver">v${escHtml(HOUSE_JD_TEMPLATE.version)}</span></div>
+        <div class="jdb-house__sub">${active
+          ? 'Built in and active — every JD below uses this structure.'
+          : 'Overridden by an uploaded template. Remove that template to return to the house format.'}</div>
+      </div>
+    </div>
+    <div class="jdb-secs">${rows}</div>
+    <div class="jdb-house__note">
+      <b>FIXED</b> sections are inserted word for word — the AI never writes or rewrites them.
+      <b>PER ROLE</b> sections are written from the brief you fill in below.
+    </div>`;
+}
+
 function renderJdTemplate() {
+  renderHousePanel();
   const badge = jdbEl('jdbTmplBadge');
   const status = jdbEl('jdbTmplStatus');
   if (!badge || !status) return;
   const t = state.jdTemplate;
+  if (usingHouseTemplate()) {
+    badge.innerHTML = '<b>House template</b>';
+    status.style.display = 'none';
+    return;
+  }
   if (t && t.text) {
     badge.innerHTML = '<b>Loaded</b>';
     const when = t.setAt ? new Date(t.setAt).toLocaleDateString() : '';
@@ -9833,7 +10020,7 @@ function renderJdTemplate() {
     status.style.display = '';
     status.style.background = 'var(--borderline-bg)';
     status.style.borderColor = 'var(--borderline-bd)';
-    status.innerHTML = 'No template yet — JDs will be generated in a clean, standard format. Add your template to match your house style.';
+    status.innerHTML = 'No custom template — the built-in Inception format is in use.';
   }
 }
 
@@ -9852,7 +10039,76 @@ function jdbCollectInputs() {
     type: g('jdbType'), exp: g('jdbExp'), reports: g('jdbReports'),
     resp: g('jdbResp'), skills: g('jdbSkills'), mandatory: g('jdbMandatory'),
     preferred: g('jdbPreferred'), edu: g('jdbEdu'), notes: g('jdbNotes'),
+    tech: g('jdbTech'),
   };
+}
+
+/** Prompt for the house template. The model writes ONLY the role-specific
+ *  sections and returns them as JSON — the boilerplate is never in its output,
+ *  so it cannot drift. */
+function jdbBuildHousePrompt(inputs, previousParts, feedback) {
+  const field = (label, val) => val ? `${label}: ${val}` : null;
+  const brief = [
+    field('Job title', inputs.title),
+    field('Location', inputs.location),
+    field('Department / team', inputs.dept),
+    field('Reports to', inputs.reports),
+    field('Employment type', inputs.type),
+    field('Experience required', inputs.exp),
+    field('Education requirement', inputs.edu),
+    field('Key responsibilities (raw notes from HR)', inputs.resp),
+    field('Required skills and tools', inputs.skills),
+    field('MANDATORY / non-negotiable requirements', inputs.mandatory),
+    field('Preferred qualifications', inputs.preferred),
+    field('Tech stack', inputs.tech),
+    field('Other instructions', inputs.notes),
+  ].filter(Boolean).join('\n');
+
+  const schema = HOUSE_AI_SECTIONS.map(sec =>
+    `  ${JSON.stringify(sec.key)}: "<${sec.heading || 'opening paragraph'} — ${sec.hint}>"`
+  ).join(',\n');
+
+  const refine = (previousParts && feedback) ? `
+
+You previously wrote the sections below. The hiring team has asked for changes.
+Return the FULL JSON again, applying their feedback and preserving everything
+they did not ask you to change.
+
+CURRENT SECTIONS:
+"""
+${JSON.stringify(previousParts, null, 2).slice(0, 12000)}
+"""
+
+REQUESTED CHANGES:
+"""
+${feedback}
+"""
+` : '';
+
+  return `You are an expert HR business partner at Inception, a G42 company in Abu Dhabi, writing a job description on the company's standard template.
+
+The template's fixed sections (About Inception, What we look for, What working at Inception offers, and the closing line) are inserted automatically and are NOT your job. Do not write them, do not summarise them, do not reference them.
+
+Write ONLY the role-specific sections, as a single STRICT JSON object — no markdown, no preamble, no code fences:
+
+{
+${schema}
+}
+
+ROLE BRIEF (everything the hiring team supplied):
+"""
+${brief}
+"""
+${refine}
+HOUSE STYLE — follow these exactly, they are what makes the JD look like ours:
+- Plain text inside each JSON string. Use "-" for bullets and two spaces then "-" for sub-bullets. No markdown asterisks, no hashes.
+- Address the candidate as "you" in the opening paragraph; use third person in "The opportunity".
+- Grouped responsibilities are the signature of this template: a category label ending in a colon, then indented sub-bullets beneath it. Never a flat list.
+- Expand HR's rough notes into complete professional sentences. Do not copy their fragments verbatim.
+- State any mandatory requirement explicitly and objectively, so a screener can verify it without judgement.
+- Never invent salary, benefits, headcount, certifications, or tooling that was not supplied. If the brief is silent on a section, return an empty string for it rather than inventing content — an omitted section is better than a fabricated one.
+- Do not restate the company description or the benefits — those are added automatically.
+- Aim for the same length and density as a typical Inception JD: substantial but not padded.`;
 }
 
 function jdbBuildPrompt(inputs, previousText, feedback) {
@@ -9934,13 +10190,16 @@ async function jdbGenerate(feedback) {
   btn.disabled = true;
   btn.innerHTML = `<span class="jdb-spinner"></span>${feedback ? 'Revising…' : 'Writing…'}`;
 
+  const house = usingHouseTemplate();
   try {
     const response = await aiFetch('claude', {
       action: feedback ? 'refine-jd' : 'generate-jd',
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         max_tokens: 4000,
-        messages: [{ role: 'user', content: jdbBuildPrompt(inputs, previousText, feedback) }],
+        messages: [{ role: 'user', content: house
+          ? jdbBuildHousePrompt(inputs, feedback ? (JDB.current && JDB.current.parts) : null, feedback)
+          : jdbBuildPrompt(inputs, previousText, feedback) }],
       }),
     });
     if (!response.ok) {
@@ -9957,6 +10216,15 @@ async function jdbGenerate(feedback) {
     text = text.replace(/^```(?:\w+)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
     if (!text) throw new Error(data.stop_reason === 'max_tokens' ? 'Response was cut off before any text' : 'The model returned an empty response');
 
+    // House template: the model returned role sections as JSON. We assemble the
+    // document, splicing the brand boilerplate in verbatim.
+    let parts = null;
+    if (house) {
+      parts = parseHouseParts(text);
+      text = assembleHouseJd(parts, inputs);
+    }
+
+    if (house && JDB.current) JDB.current.parts = parts;
     if (!JDB.current) {
       JDB.current = {
         id: 'jd' + Math.random().toString(36).slice(2, 9),
