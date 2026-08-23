@@ -119,7 +119,79 @@ const AI_KEYS = {
   anthropic: process.env.ANTHROPIC_API_KEY || '',
   openai: process.env.OPENAI_API_KEY || '',
   google: process.env.GOOGLE_API_KEY || '',
+  azure: process.env.AZURE_OPENAI_KEY || '',
+  compass: process.env.COMPASS_API_KEY || '',
 };
+
+/* ── Azure OpenAI and Core42 Compass ──────────────────────────────────────
+   Both speak the Azure OpenAI wire format:
+     POST {base}/openai/deployments/{deployment}/chat/completions?api-version=...
+     header: api-key: <key>
+   Compass is documented at https://api.core42.ai with the same shape, so one
+   handler serves both — only the base URL, deployment and version differ.
+   Compass matters here because it is UAE-hosted: for a CV screening tool,
+   candidate personal data staying in-region is often the deciding factor. */
+const AZURE_CFG = {
+  base: (process.env.AZURE_OPENAI_ENDPOINT || '').replace(/\/+$/, ''),
+  deployment: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o',
+  apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-10-21',
+};
+const COMPASS_CFG = {
+  base: (process.env.COMPASS_BASE_URL || 'https://api.core42.ai').replace(/\/+$/, ''),
+  deployment: process.env.COMPASS_DEPLOYMENT || 'gpt-4o',
+  apiVersion: process.env.COMPASS_API_VERSION || '2023-05-15',
+};
+
+function azureStyleUrl(cfg, deploymentOverride) {
+  const dep = encodeURIComponent(deploymentOverride || cfg.deployment);
+  return `${cfg.base}/openai/deployments/${dep}/chat/completions?api-version=${encodeURIComponent(cfg.apiVersion)}`;
+}
+
+/** One handler for both Azure OpenAI and Compass — identical wire format. */
+function azureStyleProxy(name, keyName, cfg, missingHint) {
+  return async (req, res) => {
+    if (!AI_KEYS[keyName]) return res.status(503).json({ error: missingHint });
+    if (!cfg.base) {
+      return res.status(503).json({ error: `${name} endpoint not configured on server` });
+    }
+    const start = Date.now();
+    const action = req.get('x-ai-action') || 'unspecified';
+    // The deployment name is the "model" for these providers.
+    const deployment = req.body?.model || cfg.deployment;
+    const body = { ...req.body };
+    delete body.model;                       // Azure takes it in the URL, not the body
+    try {
+      const r = await fetch(azureStyleUrl(cfg, deployment), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': AI_KEYS[keyName] },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      reportTelemetry({
+        model: `${keyName}:${deployment}`,
+        inputTokens: data?.usage?.prompt_tokens,
+        outputTokens: data?.usage?.completion_tokens,
+        latencyMs: Date.now() - start,
+        success: r.ok,
+        errorMessage: r.ok ? undefined : (data?.error?.message || `Upstream error ${r.status}`),
+        action,
+      });
+      res.status(r.status).json(data);
+    } catch (e) {
+      reportTelemetry({ model: `${keyName}:${deployment}`, latencyMs: Date.now() - start,
+                        success: false, errorMessage: e.message, action });
+      res.status(502).json({ error: `Upstream ${name} error: ` + e.message });
+    }
+  };
+}
+
+app.post('/api/ai/azure', auth, aiRateLimit,
+  azureStyleProxy('Azure OpenAI', 'azure', AZURE_CFG,
+    'AZURE_OPENAI_KEY / AZURE_OPENAI_ENDPOINT not configured on server'));
+
+app.post('/api/ai/compass', auth, aiRateLimit,
+  azureStyleProxy('Core42 Compass', 'compass', COMPASS_CFG,
+    'COMPASS_API_KEY not configured on server'));
 
 app.post('/api/ai/claude', auth, aiRateLimit, async (req, res) => {
   if (!AI_KEYS.anthropic) return res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured on server' });
@@ -214,7 +286,14 @@ app.get('/api/health', (req, res) => res.json({
   ok: true,
   storage: usePg ? 'postgres' : 'file',
   protected: !!TEAM_CODE,
-  serverKeys: { anthropic: !!AI_KEYS.anthropic, openai: !!AI_KEYS.openai, google: !!AI_KEYS.google },
+  serverKeys: {
+    anthropic: !!AI_KEYS.anthropic, openai: !!AI_KEYS.openai, google: !!AI_KEYS.google,
+    azure: !!(AI_KEYS.azure && AZURE_CFG.base), compass: !!AI_KEYS.compass,
+  },
+  providers: {
+    azure:   { endpoint: AZURE_CFG.base || null, deployment: AZURE_CFG.deployment, apiVersion: AZURE_CFG.apiVersion },
+    compass: { endpoint: COMPASS_CFG.base, deployment: COMPASS_CFG.deployment, apiVersion: COMPASS_CFG.apiVersion },
+  },
 }));
 
 app.get('/api/state', auth, async (req, res) => {

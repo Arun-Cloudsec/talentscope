@@ -1650,6 +1650,43 @@ tbody td { padding: 14px 16px; vertical-align: top; }
   flex-direction: column;
   gap: 4px;
 }
+/* ── Run mode + model pickers ── */
+.run-mode{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.run-mode__label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.65}
+.seg{display:inline-flex;gap:3px;padding:3px;border-radius:10px;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.14)}
+.seg__opt{border:none;background:none;padding:7px 14px;border-radius:8px;cursor:pointer;
+  font:inherit;font-size:12.5px;font-weight:700;color:inherit;opacity:.7;white-space:nowrap;
+  display:flex;align-items:center;gap:6px;transition:all .14s}
+.seg__opt em{font-style:normal;font-size:10.5px;font-weight:600;opacity:.65}
+.seg__opt:hover{opacity:1}
+.seg__opt.active{background:rgba(255,255,255,.16);opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.run-mode__hint{font-size:11.5px;opacity:.6;flex:1;min-width:220px;line-height:1.45}
+.model-picks{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.model-pick{flex:1;min-width:210px}
+.model-pick__lbl{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;
+  text-transform:uppercase;opacity:.65;margin-bottom:5px}
+.model-pick__sel{width:100%;padding:9px 11px;border-radius:9px;font:inherit;font-size:13px;
+  background:rgba(255,255,255,.07);color:inherit;border:1px solid rgba(255,255,255,.16);cursor:pointer}
+.model-pick__sel option{color:#111}
+.model-pick__meta{font-size:11px;opacity:.55;margin-top:5px}
+.model-pick__meta.warn{opacity:.95;color:#f2a65a}
+.model-tick--skipped{opacity:.55;font-style:italic}
+
+/* ── Cross-role opt-in ── */
+.cross-ask{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:15px 18px;margin-bottom:16px;
+  border-radius:12px;background:rgba(120,140,255,.10);border:1px solid rgba(120,140,255,.34)}
+.cross-ask__body{flex:1;min-width:250px}
+.cross-ask__t{font-size:14px;font-weight:800;margin-bottom:4px}
+.cross-ask__d{font-size:12.5px;opacity:.78;line-height:1.55}
+.cross-ask__actions{display:flex;gap:9px;flex-wrap:wrap}
+
+/* ── Candidate profile snapshot ── */
+.td-profile{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px;
+  font-size:11.5px;opacity:.72;line-height:1.4}
+.td-profile i{opacity:.4;font-style:normal}
+.td-exp__sub{font-size:11px;opacity:.62;margin-top:2px}
+
 .model-tick {
   font-size: 11px;
   color: var(--ink-3);
@@ -3363,28 +3400,28 @@ tbody td { padding: 14px 16px; vertical-align: top; }
         <span class="model-strip__num">§ 03</span>
         <span class="model-strip__title">AI Reviewers</span>
       </div>
-      <div class="model-cards">
-        <div class="model-card primary">
-          <div class="model-card__role">Primary</div>
-          <div class="model-card__name">Claude Sonnet 5</div>
-          <div class="model-card__meta">anthropic · default</div>
+      <div class="run-mode">
+        <div class="run-mode__label">Run with</div>
+        <div class="seg" id="runModeSeg">
+          <button type="button" class="seg__opt" data-mode="single">1 model <em>faster</em></button>
+          <button type="button" class="seg__opt active" data-mode="dual">2 models <em>cross-checked</em></button>
         </div>
-        <div class="model-card active" data-model="openai">
-          <div class="model-card__role">Secondary</div>
-          <div class="model-card__name">GPT-4o</div>
-          <div class="model-card__meta">openai · cross-check</div>
+        <div class="run-mode__hint" id="runModeHint">Two models screen every CV and must agree — slower, but nothing is shortlisted on one opinion.</div>
+      </div>
+
+      <div class="model-picks">
+        <div class="model-pick">
+          <label class="model-pick__lbl" for="primarySel">Primary model</label>
+          <select id="primarySel" class="model-pick__sel"></select>
+          <div class="model-pick__meta" id="primaryMeta"></div>
         </div>
-        <div class="model-card" data-model="gemini">
-          <div class="model-card__role">Secondary</div>
-          <div class="model-card__name">Gemini 3.1 Pro</div>
-          <div class="model-card__meta">google · cross-check</div>
-        </div>
-        <div class="model-card" data-model="haiku">
-          <div class="model-card__role">Secondary</div>
-          <div class="model-card__name">Claude Haiku 4.5</div>
-          <div class="model-card__meta">anthropic · fast</div>
+        <div class="model-pick" id="secondaryPickWrap">
+          <label class="model-pick__lbl" for="secondarySel">Second opinion</label>
+          <select id="secondarySel" class="model-pick__sel"></select>
+          <div class="model-pick__meta" id="secondaryMeta"></div>
         </div>
       </div>
+
       <label class="model-toggle">
         <span class="toggle on" id="toggleSecurity"></span>
         <span>Security scan</span>
@@ -4854,7 +4891,10 @@ const state = {
   jdName: '',
   candidates: [],
   results: [],
+  primaryModel: 'sonnet',
   secondaryModel: 'openai',
+  runMode: 'dual',        // 'single' = primary only (≈2x faster), 'dual' = cross-check
+  crossRolePrompt: true,  // ask before scanning rejected CVs against other roles
   securityOn: true,
   anthKey: '',
   oaiKey: '',
@@ -6050,14 +6090,61 @@ function setupDropZone(zoneEl, inputEl, handleFiles) {
 }
 
 /* ═══ MODEL SELECTION ═══ */
-document.querySelectorAll('.model-card[data-model]').forEach(card => {
-  card.addEventListener('click', () => {
-    document.querySelectorAll('.model-card[data-model]').forEach(c => c.classList.remove('active'));
-    card.classList.add('active');
-    state.secondaryModel = card.dataset.model;
-    const labels = { openai: 'GPT-4o', gemini: 'Gemini 3.1 Pro', haiku: 'Claude Haiku' };
-    document.getElementById('runSecondary').textContent = labels[state.secondaryModel];
-  });
+/* Both dropdowns are built from MODEL_REGISTRY and show whether each provider
+   is actually configured, so an unavailable choice is visible before the run
+   rather than as an error twenty CVs in. */
+function renderModelPickers() {
+  const pri = document.getElementById('primarySel');
+  const sec = document.getElementById('secondarySel');
+  if (!pri || !sec) return;
+
+  const opts = (selected) => Object.entries(MODEL_REGISTRY).map(([k, m]) => {
+    const ready = hasKey(m.needs);
+    return `<option value="${k}" ${k === selected ? 'selected' : ''} ${ready ? '' : 'data-unconfigured="1"'}>` +
+           `${m.label}${ready ? '' : ' — not configured'}</option>`;
+  }).join('');
+
+  pri.innerHTML = opts(state.primaryModel);
+  sec.innerHTML = opts(state.secondaryModel);
+
+  const meta = (k, el) => {
+    const m = MODEL_REGISTRY[k];
+    const ready = hasKey(m.needs);
+    el.className = 'model-pick__meta' + (ready ? '' : ' warn');
+    el.textContent = ready ? m.vendor : `${m.vendor} — key not set on the server`;
+  };
+  meta(state.primaryModel, document.getElementById('primaryMeta'));
+  meta(state.secondaryModel, document.getElementById('secondaryMeta'));
+
+  const wrap = document.getElementById('secondaryPickWrap');
+  if (wrap) wrap.style.display = isDual() ? '' : 'none';
+
+  const hint = document.getElementById('runModeHint');
+  if (hint) {
+    hint.textContent = isDual()
+      ? 'Two models screen every CV and must agree — slower, but nothing is shortlisted on one opinion.'
+      : `Only ${fullLabelForModel(state.primaryModel)} runs. About twice as fast and half the cost — shortlists are marked as unverified.`;
+  }
+
+  const runSec = document.getElementById('runSecondary');
+  if (runSec) runSec.textContent = isDual() ? fullLabelForModel(state.secondaryModel) : 'single-model run';
+  const runPri = document.getElementById('runPrimary');
+  if (runPri) runPri.textContent = fullLabelForModel(state.primaryModel);
+}
+
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'primarySel')   { state.primaryModel = e.target.value; renderModelPickers(); saveState && saveState(); }
+  if (e.target && e.target.id === 'secondarySel') { state.secondaryModel = e.target.value; renderModelPickers(); saveState && saveState(); }
+});
+
+document.addEventListener('click', e => {
+  const opt = e.target && e.target.closest && e.target.closest('#runModeSeg .seg__opt');
+  if (!opt) return;
+  document.querySelectorAll('#runModeSeg .seg__opt').forEach(o => o.classList.remove('active'));
+  opt.classList.add('active');
+  state.runMode = opt.dataset.mode;
+  renderModelPickers();
+  if (typeof saveState === 'function') saveState();
 });
 
 document.getElementById('toggleSecurity').addEventListener('click', () => {
@@ -6097,15 +6184,23 @@ async function runScreening() {
   state.jdText = effectiveJdFor(role);
   state.jdName = `${dept ? dept.name + ' · ' : ''}${role.name}`;
 
-  if (!hasKey('anthropic')) {
-    notify('Anthropic API key is required to run screening.', true);
+  const pri = MODEL_REGISTRY[state.primaryModel];
+  if (!pri) { notify('No primary model selected.', true); return; }
+  if (!hasKey(pri.needs)) {
+    notify(`${pri.label} is not configured — set its key on the server, or pick another primary model.`, true);
     return;
   }
-  const needs = { openai: 'openai', gemini: 'google', haiku: 'anthropic' };
-  if (!hasKey(needs[state.secondaryModel])) {
-    const names = { openai: 'OpenAI', gemini: 'Google', haiku: 'Anthropic' };
-    notify(`${names[state.secondaryModel]} API key is required for the selected secondary.`, true);
-    return;
+  if (isDual()) {
+    const sec = MODEL_REGISTRY[state.secondaryModel];
+    if (!sec) { notify('No second-opinion model selected.', true); return; }
+    if (!hasKey(sec.needs)) {
+      notify(`${sec.label} is not configured — set its key on the server, pick another second opinion, or switch to a single-model run.`, true);
+      return;
+    }
+    if (state.secondaryModel === state.primaryModel) {
+      notify('Primary and second opinion are the same model — pick a different one, or switch to a single-model run.', true);
+      return;
+    }
   }
 
   hideNotice();
@@ -6138,7 +6233,9 @@ async function runScreening() {
 
   const total = state.candidates.length;
   let done = 0;
-  log(`→ Starting screening · ${total} candidate${total > 1 ? 's' : ''} · Role: ${state.jdName} · Primary: Claude · Secondary: ${state.secondaryModel}`);
+  log(`→ Starting screening · ${total} candidate${total > 1 ? 's' : ''} · Role: ${state.jdName} · ` +
+      (isDual() ? `${fullLabelForModel(state.primaryModel)} + ${fullLabelForModel(state.secondaryModel)}`
+                : `${fullLabelForModel(state.primaryModel)} (single-model run)`));
 
   const batchSize = 3;
   for (let i = 0; i < state.candidates.length; i += batchSize) {
@@ -6155,7 +6252,8 @@ async function runScreening() {
       if (r.error) {
         log(`✗ ${r.name} — ${r.error}`, 'err');
       } else {
-        log(`${r.final === 'approved' ? '✓' : r.final === 'rejected' ? '✕' : '⚠'} ${r.name} — Claude: ${r.claude.verdict}, ${labelForModel(state.secondaryModel)}: ${r.secondary.verdict} → ${r.final}`,
+        log(`${r.final === 'approved' ? '✓' : r.final === 'rejected' ? '✕' : '⚠'} ${r.name} — ${labelForModel(state.primaryModel)}: ${r.claude.verdict}` +
+            (isDual() ? `, ${labelForModel(state.secondaryModel)}: ${r.secondary.verdict}` : '') + ` → ${r.final}`,
           r.final === 'approved' ? 'ok' : r.final === 'rejected' ? 'err' : 'warn');
       }
     });
@@ -6163,41 +6261,19 @@ async function runScreening() {
 
   log(`✔ Complete. ${state.results.filter(r => r.final === 'approved').length} approved, ${state.results.filter(r => r.final === 'rejected').length} rejected, ${state.results.filter(r => r.final === 'borderline').length} borderline.`, 'ok');
 
-  // ── Auto-rescan: any candidate REJECTED for the selected role is automatically
-  // checked against the other roles that have a saved JD (same department first),
-  // using a single Claude pass per role, stopping at the first strong match. ──
+  // ── Cross-role scan is now OPT-IN ──────────────────────────────────────
+  // It used to run automatically on every rejected CV against every other role
+  // with a saved JD — one model call per rejected CV per role. On 20 rejects and
+  // 5 roles that is 100 extra calls nobody asked for, and it ran BEFORE results
+  // were shown, so the screen sat there. Results now render immediately and the
+  // scan is offered as a question.
   const rejected = state.results.filter(r => r.final === 'rejected');
-  if (rejected.length > 0) {
-    const alternates = allRolesFlat()
-      .filter(x => x.role.id !== role.id && x.role.jdText && x.role.jdText.trim().length > 20)
-      .sort((a, b) => (a.dept.id === state.selectedDeptId ? -1 : 0) - (b.dept.id === state.selectedDeptId ? -1 : 0));
-    if (alternates.length > 0) {
-      log(`↻ Checking ${rejected.length} rejected CV${rejected.length > 1 ? 's' : ''} against ${alternates.length} other role${alternates.length > 1 ? 's' : ''} with saved JDs…`);
-      for (const r of rejected) {
-        const cand = state.candidates.find(c => c.id === r.id);
-        if (!cand) continue;
-        r.altMatches = [];
-        for (const alt of alternates) {
-          try {
-            const res = await callClaude(cand, effectiveJdFor(alt.role), mandatoryListFor(alt.role));
-            if (res.verdict === 'error') continue;
-            const label = `${alt.dept.name} · ${alt.role.name}`;
-            r.altMatches.push({ dept: alt.dept.name, role: alt.role.name, score: res.score, verdict: res.verdict, reason: res.reason });
-            if (res.verdict === 'approved' && (res.score ?? 0) >= state.thresholds.approve) {
-              log(`★ ${r.name} — better fit found: ${label} (score ${res.score}). Flagged for review.`, 'ok');
-              r.reason += ` | Better fit elsewhere: ${label} — score ${res.score}/100.`;
-              break; // strong match found; stop scanning further roles for this CV
-            }
-          } catch (e) { /* skip failed alternate checks */ }
-        }
-        if (r.altMatches.length && !r.altMatches.some(a => a.verdict === 'approved')) {
-          const best = r.altMatches.reduce((a, b) => ((b.score ?? 0) > (a.score ?? 0) ? b : a));
-          log(`· ${r.name} — no strong alternate fit (best: ${best.dept} · ${best.role}, ${best.score ?? '—'}/100).`);
-        }
-      }
-      log(`↻ Cross-role check complete.`, 'ok');
-    }
-  }
+  const alternates = allRolesFlat()
+    .filter(x => x.role.id !== role.id && x.role.jdText && x.role.jdText.trim().length > 20)
+    .sort((a, b) => (a.dept.id === state.selectedDeptId ? -1 : 0) - (b.dept.id === state.selectedDeptId ? -1 : 0));
+  state.pendingCrossRole = (rejected.length && alternates.length)
+    ? { rejectedIds: rejected.map(r => r.id), roleId: role.id, alternates: alternates.length }
+    : null;
 
   const claudeErrors = state.results.filter(r => r.claude.verdict === 'error');
   if (claudeErrors.length === state.results.length && state.results.length > 0) {
@@ -6209,6 +6285,7 @@ async function runScreening() {
     document.getElementById('progressSection').classList.remove('visible');
     if (typeof recordHistory === 'function') recordHistory();
     renderResults();
+    renderCrossRolePrompt();
     // Auto-download the Excel report (Summary + Candidate detail tabs) as soon as screening finishes.
     if (state.results.length > 0) {
       try {
@@ -6221,6 +6298,98 @@ async function runScreening() {
   }, 600);
 }
 
+/** Offered after screening — never run automatically. */
+async function runCrossRoleScan() {
+  const p = state.pendingCrossRole;
+  if (!p) return;
+  const banner = document.getElementById('crossRoleAsk');
+  if (banner) banner.remove();
+
+  const role = currentRole();
+  const alternates = allRolesFlat()
+    .filter(x => x.role.id !== p.roleId && x.role.jdText && x.role.jdText.trim().length > 20)
+    .sort((a, b) => (a.dept.id === state.selectedDeptId ? -1 : 0) - (b.dept.id === state.selectedDeptId ? -1 : 0));
+  const rejected = state.results.filter(r => p.rejectedIds.includes(r.id));
+  if (!rejected.length || !alternates.length) { state.pendingCrossRole = null; return; }
+
+  document.getElementById('progressSection').classList.add('visible');
+  document.getElementById('progTotal').textContent = rejected.length;
+  document.getElementById('progNum').textContent = 0;
+  document.getElementById('progBar').style.width = '0%';
+  log(`↻ Cross-role scan: ${rejected.length} rejected CV${rejected.length > 1 ? 's' : ''} against ${alternates.length} other role${alternates.length > 1 ? 's' : ''}…`);
+
+  let n = 0;
+  for (const r of rejected) {
+    const cand = state.candidates.find(c => c.id === r.id);
+    if (!cand) continue;
+    r.altMatches = [];
+    for (const alt of alternates) {
+      try {
+        // Cross-role uses the PRIMARY model only — this is a triage sweep, not a
+        // hiring decision, so a second opinion per role is not worth the wait.
+        const res = await callModel(state.primaryModel, cand, effectiveJdFor(alt.role), mandatoryListFor(alt.role));
+        if (res.verdict === 'error') continue;
+        const label = `${alt.dept.name} · ${alt.role.name}`;
+        r.altMatches.push({ dept: alt.dept.name, role: alt.role.name, score: res.score, verdict: res.verdict, reason: res.reason });
+        if (res.verdict === 'approved' && (res.score ?? 0) >= state.thresholds.approve) {
+          log(`★ ${r.name} — better fit found: ${label} (score ${res.score}). Flagged for review.`, 'ok');
+          r.reason += ` | Better fit elsewhere: ${label} — score ${res.score}/100.`;
+          break;
+        }
+      } catch (e) { /* skip failed alternate checks */ }
+    }
+    if (r.altMatches.length && !r.altMatches.some(a => a.verdict === 'approved')) {
+      const best = r.altMatches.reduce((a, b) => ((b.score ?? 0) > (a.score ?? 0) ? b : a));
+      log(`· ${r.name} — no strong alternate fit (best: ${best.dept} · ${best.role}, ${best.score ?? '—'}/100).`);
+    }
+    n++;
+    document.getElementById('progNum').textContent = n;
+    document.getElementById('progBar').style.width = Math.round((n / rejected.length) * 100) + '%';
+  }
+
+  const found = rejected.filter(r => (r.altMatches || []).some(a => a.verdict === 'approved')).length;
+  log(`↻ Cross-role scan complete — ${found} candidate${found === 1 ? '' : 's'} matched another role.`, 'ok');
+  state.pendingCrossRole = null;
+  setTimeout(() => document.getElementById('progressSection').classList.remove('visible'), 500);
+  renderResults();
+  notify(found ? `${found} rejected CV${found === 1 ? '' : 's'} matched another open role — see the results below.`
+               : 'Cross-role scan finished — no strong matches elsewhere.', false);
+}
+
+function dismissCrossRole() {
+  state.pendingCrossRole = null;
+  const b = document.getElementById('crossRoleAsk');
+  if (b) b.remove();
+}
+
+/** The ask itself — rendered above the results, not as a blocking dialog. */
+function renderCrossRolePrompt() {
+  const host = document.getElementById('results');
+  const old = document.getElementById('crossRoleAsk');
+  if (old) old.remove();
+  const p = state.pendingCrossRole;
+  if (!p || !host) return;
+  const n = p.rejectedIds.length, m = p.alternates;
+  const el = document.createElement('div');
+  el.id = 'crossRoleAsk';
+  el.className = 'cross-ask';
+  el.innerHTML = `
+    <div class="cross-ask__body">
+      <div class="cross-ask__t">↻ Scan the rejected CVs against your other roles?</div>
+      <div class="cross-ask__d">
+        <b>${n}</b> candidate${n === 1 ? ' was' : 's were'} rejected for this role.
+        You have <b>${m}</b> other role${m === 1 ? '' : 's'} with a saved JD.
+        This runs roughly <b>${n * m}</b> extra check${n * m === 1 ? '' : 's'} and takes a
+        little time — your results above are already final either way.
+      </div>
+    </div>
+    <div class="cross-ask__actions">
+      <button class="btn btn--primary" onclick="runCrossRoleScan()">Yes, scan them</button>
+      <button class="btn" onclick="dismissCrossRole()">No thanks</button>
+    </div>`;
+  host.insertBefore(el, host.firstChild);
+}
+
 function log(text, cls) {
   const log = document.getElementById('progLog');
   const line = document.createElement('span');
@@ -6229,7 +6398,9 @@ function log(text, cls) {
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
 }
-function labelForModel(m) { return { openai: 'GPT', gemini: 'Gemini', haiku: 'Haiku' }[m] || m; }
+function labelForModel(m) { return (MODEL_REGISTRY[m] && MODEL_REGISTRY[m].short) || m; }
+function fullLabelForModel(m) { return (MODEL_REGISTRY[m] && MODEL_REGISTRY[m].label) || m; }
+function isDual() { return state.runMode !== 'single'; }
 
 function mergeUnique(a, b) {
   const seen = new Set();
@@ -6283,29 +6454,58 @@ async function screenCandidate(candidate) {
     mandatoryCheck: [], mandatoryMissing: [], mandatoryGated: false,
   };
   try {
-    const [claudeResult, secondaryResult] = await Promise.all([
-      callClaude(candidate),
-      callSecondary(candidate),
-    ]);
-    base.email = claudeResult.email || secondaryResult.email || '—';
-    base.phone = claudeResult.phone || secondaryResult.phone || '—';
-    base.experience = claudeResult.experience || secondaryResult.experience || '—';
-    base.skills = claudeResult.skills.length ? claudeResult.skills : secondaryResult.skills;
-    base.matchedSkills = mergeUnique(claudeResult.matchedSkills, secondaryResult.matchedSkills);
-    base.gaps = mergeUnique(claudeResult.gaps, secondaryResult.gaps);
+    // Single mode runs ONE model — roughly half the latency and half the cost.
+    // Dual runs both and cross-checks them, which is the safer default but slower.
+    const dual = isDual();
+    const [claudeResult, secondaryResult] = dual
+      ? await Promise.all([ callModel(state.primaryModel, candidate),
+                            callModel(state.secondaryModel, candidate) ])
+      : [ await callModel(state.primaryModel, candidate), null ];
+    const sec = secondaryResult || {};
+    base.email = claudeResult.email || sec.email || '—';
+    base.phone = claudeResult.phone || sec.phone || '—';
+    base.experience = claudeResult.experience || sec.experience || '—';
+    // Profile snapshot for the shortlist — recruiters ask these three first.
+    base.yearsExperience = firstNum(claudeResult.yearsExperience, sec.yearsExperience);
+    base.currentCompany  = claudeResult.currentCompany  || sec.currentCompany  || '';
+    base.currentTitle    = claudeResult.currentTitle    || sec.currentTitle    || '';
+    base.location        = claudeResult.location        || sec.location        || '';
+    base.noticePeriod    = claudeResult.noticePeriod    || sec.noticePeriod    || '';
+    base.skills = (claudeResult.skills && claudeResult.skills.length) ? claudeResult.skills : (sec.skills || []);
+    base.matchedSkills = mergeUnique(claudeResult.matchedSkills, sec.matchedSkills);
+    base.gaps = mergeUnique(claudeResult.gaps, sec.gaps);
     base.claude = { verdict: claudeResult.verdict, reason: claudeResult.reason, score: claudeResult.score };
-    base.secondary = { verdict: secondaryResult.verdict, reason: secondaryResult.reason, score: secondaryResult.score };
-    base.mandatoryCheck = mergeMandatoryChecks(mandatoryList, claudeResult.mandatoryCheck, secondaryResult.mandatoryCheck);
+    base.secondary = dual
+      ? { verdict: sec.verdict, reason: sec.reason, score: sec.score }
+      : { verdict: 'skipped', reason: 'Single-model run — no cross-check performed.', score: null };
+    base.runMode = dual ? 'dual' : 'single';
+    base.primaryModel = state.primaryModel;
+    base.secondaryModelUsed = dual ? state.secondaryModel : null;
+    base.mandatoryCheck = mergeMandatoryChecks(mandatoryList, claudeResult.mandatoryCheck, dual ? sec.mandatoryCheck : claudeResult.mandatoryCheck);
     base.mandatoryMissing = base.mandatoryCheck.filter(m => !m.met).map(m => m.requirement);
 
     // Combined score = average of whichever model(s) returned a numeric score.
-    const scores = [claudeResult.score, secondaryResult.score].filter(x => typeof x === 'number' && x !== null);
+    const scores = [claudeResult.score, dual ? sec.score : null].filter(x => typeof x === 'number' && x !== null);
     base.score = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
 
-    const c = claudeResult.verdict, s = secondaryResult.verdict;
+    const c = claudeResult.verdict, s = dual ? sec.verdict : c;
     const { approve: approveT, review: reviewT } = state.thresholds;
 
-    if (c === 'error' && s === 'error') {
+    // Single-model path: score decides, and nothing is auto-approved on one
+    // opinion above the threshold without being marked as unverified.
+    if (!dual) {
+      if (c === 'error') {
+        base.final = 'error'; base.reason = claudeResult.reason || 'Model failed';
+      } else if (base.score !== null) {
+        base.final = base.score >= approveT ? 'approved'
+                   : base.score < reviewT ? 'rejected' : 'borderline';
+        base.reason = `Match score ${base.score}/100 (single-model run, ${fullLabelForModel(state.primaryModel)}) — ${claudeResult.reason}`;
+      } else {
+        base.final = c;
+        base.reason = claudeResult.reason;
+      }
+      base.singleModelUnverified = base.final === 'approved';
+    } else if (c === 'error' && s === 'error') {
       base.final = 'error'; base.reason = 'Both models failed';
     } else if (c === 'error' || s === 'error') {
       const only = c === 'error' ? secondaryResult : claudeResult;
@@ -6417,6 +6617,11 @@ Respond with ONLY a single JSON object — no markdown, no preamble:
   "email": "<email if found, else empty>",
   "phone": "<phone/mobile number if found, else empty>",
   "experience": "<total years of relevant experience, e.g. '7 years'>",
+  "years_experience": <number — total years of professional experience as a NUMBER only, e.g. 7 or 7.5; use null if the CV does not allow a reliable figure>,
+  "current_company": "<the employer in the candidate's most recent / current role, else empty>",
+  "current_title": "<their job title in that most recent / current role, else empty>",
+  "location": "<city and country of residence if stated, e.g. 'Dubai, UAE', else empty>",
+  "notice_period": "<notice period or availability if stated, else empty>",
   "score": <integer 0-100, overall percentage match of this candidate against the JD requirements>,
   "skills": ["<top 5-8 relevant skills the candidate has, matching the JD>"],
   "matched_skills": ["<JD requirements/skills this candidate DOES satisfy, phrased close to the JD wording>"],
@@ -6425,6 +6630,12 @@ Respond with ONLY a single JSON object — no markdown, no preamble:
   "reason": "<ONE crisp sentence (max 25 words) stating why>"${mandatoryJson}
 }
 ${mandatoryRules}
+
+PROFILE SNAPSHOT RULES:
+- "years_experience" must be a NUMBER, not a string. Count professional experience only — internships and education do not count. If the CV lists dates, compute from them rather than trusting a self-declared headline figure. Use null when the dates are too incomplete to be sure.
+- "current_company" and "current_title" come from the MOST RECENT role. If the candidate is between jobs, use the last employer and say so in "notice_period" (e.g. "Immediately available").
+- "location" is where the candidate lives, NOT where their employer is headquartered. Leave it empty rather than guessing from an employer's address or a phone country code.
+- Leave any of these empty (or null) rather than inferring — a blank field is far better than a confident wrong one a recruiter then repeats to a hiring manager.
 
 SCORING RUBRIC (be consistent and strict):
 - Weigh required/must-have skills and minimum years of experience most heavily; "preferred" qualifications count for less.
@@ -6443,7 +6654,7 @@ RULES:
 
 /* ── AI request router: use the server proxy (keys held in Railway env vars)
    when available; fall back to direct calls with per-browser keys otherwise. ── */
-let SERVER_KEYS = { anthropic: false, openai: false, google: false };
+let SERVER_KEYS = { anthropic: false, openai: false, google: false, azure: false, compass: false };
 
 /* Central-sync state — declared here (early) because updateKeyIndicator()
    reads SYNC.serverAvailable during initial page load. */
@@ -6462,8 +6673,17 @@ function aiFetch(provider, { body, geminiModel, action } = {}) {
     haiku: ['/api/ai/claude', 'anthropic'],
     openai: ['/api/ai/openai', 'openai'],
     gemini: ['/api/ai/gemini' + (geminiModel ? `?model=${encodeURIComponent(geminiModel)}` : ''), 'google'],
+    azure: ['/api/ai/azure', 'azure'],
+    compass: ['/api/ai/compass', 'compass'],
   };
   const [proxyPath, keyName] = proxyMap[provider];
+  // Azure and Compass are server-side only. Their keys are never exposed to the
+  // browser, so there is no direct-from-browser fallback — fail loudly instead
+  // of silently falling through to a provider the user did not choose.
+  if ((provider === 'azure' || provider === 'compass') && !(SYNC.serverAvailable && SERVER_KEYS[keyName])) {
+    const label = provider === 'azure' ? 'Azure OpenAI' : 'Core42 Compass';
+    return Promise.reject(new Error(`${label} is not configured on the server. Set its key and endpoint in Railway → Variables.`));
+  }
   if (SYNC.serverAvailable && SERVER_KEYS[keyName]) {
     const headers = syncHeaders();
     if (action) headers['x-ai-action'] = action;
@@ -6493,10 +6713,27 @@ function aiFetch(provider, { body, geminiModel, action } = {}) {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
   });
 }
-function hasKey(which) { // 'anthropic' | 'openai' | 'google'
+function hasKey(which) { // 'anthropic' | 'openai' | 'google' | 'azure' | 'compass'
+  // Azure and Compass have no browser-side key by design — server only.
+  if (which === 'azure' || which === 'compass') {
+    return !!(SYNC.serverAvailable && SERVER_KEYS[which]);
+  }
   const local = { anthropic: state.anthKey, openai: state.oaiKey, google: state.googKey };
   return !!local[which] || (SYNC.serverAvailable && SERVER_KEYS[which]);
 }
+
+/* ── Model registry ───────────────────────────────────────────────────────
+   One place mapping a model choice to its label, the credential it needs and
+   the caller that runs it — so adding a provider does not mean editing six
+   different switch statements. */
+const MODEL_REGISTRY = {
+  sonnet:  { label: 'Claude Sonnet 5', short: 'Claude',  needs: 'anthropic', vendor: 'Anthropic' },
+  haiku:   { label: 'Claude Haiku 4.5', short: 'Haiku',  needs: 'anthropic', vendor: 'Anthropic' },
+  openai:  { label: 'OpenAI GPT',      short: 'GPT',     needs: 'openai',    vendor: 'OpenAI' },
+  gemini:  { label: 'Google Gemini',   short: 'Gemini',  needs: 'google',    vendor: 'Google' },
+  azure:   { label: 'Azure OpenAI',    short: 'Azure',   needs: 'azure',     vendor: 'Microsoft Azure' },
+  compass: { label: 'Compass (Core42)', short: 'Compass', needs: 'compass',  vendor: 'Core42 · UAE-hosted' },
+};
 
 async function callClaude(candidate, jdOverride, mandatoryOverride) {
   const prompt = buildPrompt(candidate, jdOverride, mandatoryOverride);
@@ -6563,6 +6800,51 @@ async function callOpenAI(prompt) {
   } catch (e) { return { verdict: 'error', reason: e.message, name: '', email: '', phone: '', experience: '', score: null, skills: [], matchedSkills: [], gaps: [], mandatoryCheck: [] }; }
 }
 
+const ERR_SHAPE = m => ({ verdict:'error', reason:m, name:'', email:'', phone:'', experience:'',
+  score:null, skills:[], matchedSkills:[], gaps:[], mandatoryCheck:[] });
+
+/** Azure OpenAI and Compass share the Azure wire format, so one caller serves
+ *  both — the server decides the endpoint from the provider it was called on. */
+async function callAzureStyle(provider, prompt, deployment) {
+  const label = MODEL_REGISTRY[provider].label;
+  try {
+    const response = await aiFetch(provider, {
+      action: 'screen-candidate',
+      body: JSON.stringify({
+        model: deployment || undefined,     // server falls back to its configured deployment
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1500,
+        response_format: { type: 'json_object' },
+      }),
+    });
+    if (!response.ok) {
+      const t = await response.text().catch(() => '');
+      let friendly = `${label} HTTP ${response.status}`;
+      if (response.status === 401 || response.status === 403) friendly = `${label}: key rejected`;
+      else if (response.status === 404) friendly = `${label}: deployment not found — check the deployment name`;
+      else if (response.status === 429) friendly = `${label}: quota exceeded — retry shortly`;
+      else if (response.status === 503) friendly = t.slice(0, 140) || friendly;
+      throw new Error(friendly);
+    }
+    const data = await response.json();
+    return parseJSONResponse(data.choices?.[0]?.message?.content || '');
+  } catch (e) { return ERR_SHAPE(e.message); }
+}
+
+/** Run one model choice against a prompt. Everything routes through here. */
+async function callModel(choice, candidate, jdOverride, mandatoryOverride) {
+  const prompt = buildPrompt(candidate, jdOverride, mandatoryOverride);
+  switch (choice) {
+    case 'sonnet':  return callClaude(candidate, jdOverride, mandatoryOverride);
+    case 'haiku':   return callHaiku(prompt);
+    case 'openai':  return callOpenAI(prompt);
+    case 'gemini':  return callGemini(prompt);
+    case 'azure':   return callAzureStyle('azure', prompt);
+    case 'compass': return callAzureStyle('compass', prompt);
+    default:        return ERR_SHAPE('Unknown model: ' + choice);
+  }
+}
+
 async function callGemini(prompt) {
   try {
     const response = await aiFetch('gemini', {
@@ -6593,6 +6875,45 @@ async function callHaiku(prompt) {
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
     return parseJSONResponse(text);
   } catch (e) { return { verdict: 'error', reason: e.message, name: '', email: '', phone: '', experience: '', score: null, skills: [], matchedSkills: [], gaps: [], mandatoryCheck: [] }; }
+}
+
+/** First finite number from the arguments, else null. */
+function firstNum(...vals) {
+  for (const v of vals) if (typeof v === 'number' && Number.isFinite(v)) return v;
+  return null;
+}
+
+/** Years of experience as a number. Prefers the model's numeric field; falls
+ *  back to digits in the free-text "experience" string ("7 years" → 7). */
+function parseYears(numeric, freeText) {
+  // Number(null) and Number('') are both 0, which would silently report every
+  // candidate as "0 yrs exp" instead of falling back to the free-text field.
+  // Only treat it as numeric when the model actually sent a number.
+  const isNum = typeof numeric === 'number'
+    || (typeof numeric === 'string' && numeric.trim() !== '' && Number.isFinite(Number(numeric)));
+  if (isNum) {
+    const n = Number(numeric);
+    if (Number.isFinite(n) && n > 0 && n < 70) return Math.round(n * 10) / 10;
+  }
+  const m = String(freeText || '').match(/(\d+(?:\.\d+)?)\s*\+?\s*(?:years|yrs|y\b)/i);
+  if (m) {
+    const f = parseFloat(m[1]);
+    if (Number.isFinite(f) && f >= 0 && f < 70) return Math.round(f * 10) / 10;
+  }
+  return null;
+}
+
+/** "7 yrs · Senior Architect at Inception · Dubai, UAE" — blanks are skipped. */
+function profileLine(r) {
+  const bits = [];
+  if (r.yearsExperience != null) bits.push(`${r.yearsExperience} yr${r.yearsExperience === 1 ? '' : 's'} exp`);
+  else if (r.experience && r.experience !== '—') bits.push(r.experience);
+  if (r.currentTitle && r.currentCompany) bits.push(`${r.currentTitle} at ${r.currentCompany}`);
+  else if (r.currentCompany) bits.push(r.currentCompany);
+  else if (r.currentTitle) bits.push(r.currentTitle);
+  if (r.location) bits.push(r.location);
+  if (r.noticePeriod) bits.push(`Notice: ${r.noticePeriod}`);
+  return bits;
 }
 
 function parseJSONResponse(text) {
@@ -6627,6 +6948,13 @@ function parseJSONResponse(text) {
   return {
     name: parsed.name || '', email: parsed.email || '', phone: parsed.phone || '',
     experience: parsed.experience || '',
+    // Profile snapshot. Kept as null/'' when absent — a blank cell is honest,
+    // a fabricated company name is not.
+    yearsExperience: parseYears(parsed.years_experience, parsed.experience),
+    currentCompany: String(parsed.current_company || '').trim(),
+    currentTitle: String(parsed.current_title || '').trim(),
+    location: String(parsed.location || '').trim(),
+    noticePeriod: String(parsed.notice_period || '').trim(),
     score: score,
     skills: Array.isArray(parsed.skills) ? parsed.skills : [],
     matchedSkills: Array.isArray(parsed.matched_skills) ? parsed.matched_skills : [],
@@ -6723,7 +7051,10 @@ function renderTable() {
   rows.sort((a, b) => {
     let va, vb;
     if (state.sortKey === 'verdict') { va = order[a.final] ?? 9; vb = order[b.final] ?? 9; }
-    else if (state.sortKey === 'experience') { va = extractYears(a.experience); vb = extractYears(b.experience); }
+    else if (state.sortKey === 'experience') {
+      va = a.yearsExperience != null ? a.yearsExperience : extractYears(a.experience);
+      vb = b.yearsExperience != null ? b.yearsExperience : extractYears(b.experience);
+    }
     else if (state.sortKey === 'score') { va = a.score ?? -1; vb = b.score ?? -1; }
     else { va = (a[state.sortKey] || '').toLowerCase(); vb = (b[state.sortKey] || '').toLowerCase(); }
     if (va < vb) return -1 * state.sortDir;
@@ -6748,14 +7079,22 @@ function renderTable() {
       <td>
         <div class="td-name">${escHtml(r.name)} ${warn}</div>
         <div class="td-email">${escHtml(r.email || r.filename)}</div>
+        ${profileLine(r).length ? `<div class="td-profile">${profileLine(r).map(b => `<span>${escHtml(b)}</span>`).join('<i>·</i>')}</div>` : ''}
       </td>
-      <td class="td-exp">${escHtml(r.experience || '—')}</td>
+      <td class="td-exp">${r.yearsExperience != null
+          ? `<b>${r.yearsExperience}</b> yr${r.yearsExperience === 1 ? '' : 's'}`
+          : escHtml(r.experience || '—')}
+        ${r.currentCompany ? `<div class="td-exp__sub">${escHtml(r.currentCompany)}</div>` : ''}
+        ${r.location ? `<div class="td-exp__sub">${escHtml(r.location)}</div>` : ''}
+      </td>
       <td class="td-score">${scoreBadgeHTML(r.score)}</td>
       <td class="td-skills">${skillsHTML}</td>
       <td>
         <div class="model-verdicts">
-          <div class="model-tick"><span class="mini-dot ${r.claude.verdict}"></span> Claude · ${r.claude.verdict}${typeof r.claude.score === 'number' ? ' (' + r.claude.score + ')' : ''}</div>
-          <div class="model-tick"><span class="mini-dot ${r.secondary.verdict}"></span> ${labelForModel(state.secondaryModel)} · ${r.secondary.verdict}${typeof r.secondary.score === 'number' ? ' (' + r.secondary.score + ')' : ''}</div>
+          <div class="model-tick"><span class="mini-dot ${r.claude.verdict}"></span> ${escHtml(labelForModel(r.primaryModel || state.primaryModel))} · ${r.claude.verdict}${typeof r.claude.score === 'number' ? ' (' + r.claude.score + ')' : ''}</div>
+          ${r.runMode === 'single'
+            ? `<div class="model-tick model-tick--skipped" title="Single-model run — no second opinion was taken">◌ single-model run</div>`
+            : `<div class="model-tick"><span class="mini-dot ${r.secondary.verdict}"></span> ${escHtml(labelForModel(r.secondaryModelUsed || state.secondaryModel))} · ${r.secondary.verdict}${typeof r.secondary.score === 'number' ? ' (' + r.secondary.score + ')' : ''}</div>`}
         </div>
       </td>
       <td>${mandatoryBadgeHTML(r)}</td>
@@ -9444,7 +9783,7 @@ function restoreSession() {
       const h = await fetch('/api/health');
       if (h.ok) {
         SYNC.serverAvailable = true;
-        try { const info = await h.json(); if (info.serverKeys) { SERVER_KEYS = info.serverKeys; updateKeyIndicator(); if (typeof updateRunReady === 'function') updateRunReady(); } } catch (e) {}
+        try { const info = await h.json(); if (info.serverKeys) { SERVER_KEYS = info.serverKeys; updateKeyIndicator(); if (typeof updateRunReady === 'function') updateRunReady(); if (typeof renderModelPickers === 'function') renderModelPickers(); } } catch (e) {}
         await syncPull({ silentIfUnchanged: false });
         setInterval(() => syncPull(), SYNC.pollMs);
       }
@@ -10076,6 +10415,7 @@ jdbEl('jdbSaveRole').addEventListener('click', () => {
   if (typeof renderRolesDashboard === 'function') renderRolesDashboard();
   if (typeof renderCriteriaPanel === 'function') renderCriteriaPanel();
   if (typeof renderScreenRoleStatus === 'function') renderScreenRoleStatus();
+  if (typeof renderModelPickers === 'function') renderModelPickers();
   if (typeof updateJdStat === 'function') updateJdStat();
   updateRunButton();
   persistSession();
